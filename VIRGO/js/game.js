@@ -104,7 +104,7 @@ vidaBar.fixedToCamera = true;
 // WEAPON PLAYER
 weapon = game.add.weapon(40,'bullet');
 weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
-weapon.bulletLifespan = 150;
+weapon.bulletLifespan = 400;
 weapon.bulletSpeed = 1800;
 weapon.fireRate = 120;
 weapon.trackSprite(player,0,0,true);
@@ -289,8 +289,8 @@ let bulletKey = type==1?'laser1':type==2?'laser2':'laser3';
 let w = game.add.weapon(20,bulletKey);
 w.trackSprite(e,0,0,true);
 
-if(type==1){ w.bulletSpeed=800; w.bulletLifespan=30; }
-if(type==2){ w.bulletSpeed=1600; w.bulletLifespan=15; }
+if(type==1){ w.bulletSpeed=300; w.bulletLifespan=30; }
+if(type==2){ w.bulletSpeed=1800; w.bulletLifespan=150; }
 if(type==3){ w.bulletSpeed=800; w.bulletLifespan=60; }
 
 w.nextFire = 0;
