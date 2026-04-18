@@ -21,6 +21,8 @@ var vidaBar;
 var music;
 var sndLaser, sndLaser1, sndLaser2, sndLaser3, sndExplosion;
 
+var lastEnemySound = 0; // 🔥 control audio
+
 // ================= GAME =================
 var Game = {
 
@@ -29,6 +31,7 @@ preload: function(){
 game.load.image('space', 'assets/space_bg.jpg');
 game.load.spritesheet('ship', 'assets/sprites/nave.png', 64, 64);
 
+// 🔥 FIX SPRITESHEET
 game.load.spritesheet('enemy', 'assets/sprites/enemy.png', 64, 64);
 game.load.spritesheet('enemy2', 'assets/sprites/enemy2.png', 64, 64);
 game.load.spritesheet('enemy3', 'assets/sprites/enemy3.png', 64, 64);
@@ -63,6 +66,11 @@ sndLaser1 = game.add.audio('laser1');
 sndLaser2 = game.add.audio('laser2');
 sndLaser3 = game.add.audio('laser3');
 sndExplosion = game.add.audio('explosion');
+
+// 🔥 BALANCE AUDIO
+sndLaser1.volume = 0.2;
+sndLaser2.volume = 0.15;
+sndLaser3.volume = 0.1;
 
 music = game.add.audio('music');
 music.loopFull(0.5);
@@ -104,7 +112,7 @@ update: function(){
 
 if(vida <= 0){ this.dead(); return; }
 
-// ✅ MOVIMIENTO ARREGLADO
+// MOVIMIENTO
 if(game.input.activePointer.isDown){
 game.physics.arcade.accelerateToPointer(player, game.input.activePointer, 600);
 player.rotation = game.physics.arcade.angleToPointer(player);
@@ -146,7 +154,12 @@ game.physics.arcade.moveToObject(e,player,120);
 
 if(game.time.now > w.nextFire){
 let b = w.fireAtSprite(player);
-if(b) sndLaser1.play();
+
+if(b && game.time.now > lastEnemySound){
+sndLaser1.play();
+lastEnemySound = game.time.now + 120;
+}
+
 w.nextFire = game.time.now + 1200;
 }
 
@@ -175,7 +188,11 @@ game.physics.arcade.velocityFromAngle(e.angle+a,500,b.body.velocity);
 }
 }
 
+if(game.time.now > lastEnemySound){
 sndLaser2.play();
+lastEnemySound = game.time.now + 120;
+}
+
 w.nextFire = game.time.now + 400;
 }
 
@@ -204,7 +221,11 @@ game.physics.arcade.velocityFromAngle(a,400,b.body.velocity);
 }
 }
 
+if(game.time.now > lastEnemySound){
 sndLaser3.play();
+lastEnemySound = game.time.now + 200;
+}
+
 w.nextFire = game.time.now + 2500;
 }
 
@@ -235,6 +256,14 @@ let e = game.add.sprite(x,y,key);
 game.physics.arcade.enable(e);
 e.anchor.set(0.5);
 
+// 🔥 SOLO NAVE
+e.frame = 0;
+
+// 🔥 ANIMACION EXPLOSION
+e.animations.add('explode',[1,2,3,4],20,false);
+
+if(type==3) e.scale.set(2);
+
 let bulletKey = type==1?'laser1':type==2?'laser2':'laser3';
 
 let w = game.add.weapon(20,bulletKey);
@@ -253,8 +282,13 @@ if(type==3){ enemies3.push(e); weapons3.push(w); }
 hitEnemy: function(enemy,bullet){
 
 bullet.kill();
-enemy.kill();
 sndExplosion.play();
+
+enemy.animations.play('explode');
+
+enemy.animations.currentAnim.onComplete.add(function(){
+enemy.kill();
+}, this);
 
 counter++;
 
