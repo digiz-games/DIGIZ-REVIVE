@@ -3,7 +3,6 @@ var Menu = {
     game.stage.backgroundColor = '#000000';
     game.load.image('fondomenu', 'assets/map/fondolvl2.png');
     game.load.image("logo", "assets/map/digizlogo2.png");
-    game.load.image("facebook", "assets/sprites/facebook.png");
     game.load.audio('digizop', ['assets/audio/digizop.mp3']);
     game.load.spritesheet('botonjugar', 'assets/sprites/botonjugar.png', 192, 192, 8);
 
@@ -52,11 +51,7 @@ var Menu = {
     logo.anchor.setTo(0.5, 0.5);
     logo.scale.setTo(0.2, 0.2);
 
-    facebook = game.add.sprite(game.width/2,game.height/2 +150, 'facebook');
-    facebook.anchor.setTo(0.5, 0.5);
-    //facebook.scale.setTo(0.2, 0.2);
-    facebook.inputEnabled = true;
-    facebook.events.onInputDown.add(this.irfacebook, this);
+
 
 
   },
