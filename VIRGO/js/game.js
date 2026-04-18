@@ -374,10 +374,12 @@ a.body.mass = scale * 30;
 a.body.bounce.set(0.05);
 
 a.body.velocity.set(
-game.rnd.integerInRange(-30,30),
-game.rnd.integerInRange(-30,30)
+game.rnd.integerInRange(-10,10),
+game.rnd.integerInRange(-10,10)
 );
 
+a.body.drag.set(50);
+  
 ast3.push(a);
 
 },
