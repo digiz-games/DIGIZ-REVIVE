@@ -1,16 +1,20 @@
 // ================= VARIABLES =================
 var player;
 
-var enemies = [];
-var weapons1 = [];
+var enemies = [], enemies2 = [], enemies3 = [];
+var weapons1 = [], weapons2 = [], weapons3 = [];
 
-var ast2 = [];
+var ast1 = [], ast2 = [], ast3 = [];
 
 var vida = 200;
 var maxVida = 200;
 
 var weapon;
 var counter = 0;
+
+// 🔥 CONTADORES EVOLUCIÓN
+var kills1 = 0;
+var kills2 = 0;
 
 var lastTap = 0;
 var startTime = 0;
@@ -19,7 +23,7 @@ var scoreText;
 var vidaBar;
 
 var music;
-var sndLaser, sndLaser1, sndExplosion;
+var sndLaser, sndLaser1, sndLaser2, sndLaser3, sndExplosion;
 
 // ================= GAME =================
 var Game = {
@@ -30,14 +34,22 @@ game.load.image('space', 'assets/space_bg.jpg');
 game.load.spritesheet('ship', 'assets/sprites/nave.png', 64, 64);
 
 game.load.spritesheet('enemy', 'assets/sprites/enemy.png',64,64);
+game.load.spritesheet('enemy2', 'assets/sprites/enemy2.png',64,64);
+game.load.spritesheet('enemy3', 'assets/sprites/enemy3.png',64,64);
 
 game.load.image('bullet', 'assets/sprites/laser.png');
 game.load.image('laser1', 'assets/sprites/laser1.png');
+game.load.image('laser2', 'assets/sprites/laser2.png');
+game.load.image('laser3', 'assets/sprites/laser3.png');
 
+game.load.image('asteroide', 'assets/sprites/asteroide.png');
 game.load.image('asteroide2', 'assets/sprites/asteroide2.png');
+game.load.image('asteroide3', 'assets/sprites/asteroide3.png');
 
 game.load.audio('laser', 'assets/audio/laser.mp3');
 game.load.audio('laser1', 'assets/audio/laser1.mp3');
+game.load.audio('laser2', 'assets/audio/laser2.mp3');
+game.load.audio('laser3', 'assets/audio/laser3.mp3');
 game.load.audio('explosion', 'assets/audio/explosion.wav');
 game.load.audio('music', 'assets/audio/virgo_song.mp3');
 
@@ -50,12 +62,14 @@ game.world.removeAll();
 game.time.events.removeAll();
 game.input.onDown.removeAll();
 
-enemies = [];
-weapons1 = [];
-ast2 = [];
+enemies = []; enemies2 = []; enemies3 = [];
+weapons1 = []; weapons2 = []; weapons3 = [];
+ast1 = []; ast2 = []; ast3 = [];
 
 vida = maxVida;
 counter = 0;
+kills1 = 0;
+kills2 = 0;
 
 game.world.setBounds(0,0,20000,20000);
 game.physics.startSystem(Phaser.Physics.ARCADE);
@@ -63,7 +77,9 @@ game.add.tileSprite(0,0,20000,20000,'space');
 
 // AUDIO
 sndLaser = game.add.audio('laser'); sndLaser.volume = 0.4;
-sndLaser1 = game.add.audio('laser1'); sndLaser1.volume = 0.15;
+sndLaser1 = game.add.audio('laser1'); sndLaser1.volume = 0.1;
+sndLaser2 = game.add.audio('laser2'); sndLaser2.volume = 0.1;
+sndLaser3 = game.add.audio('laser3'); sndLaser3.volume = 0.1;
 sndExplosion = game.add.audio('explosion');
 
 music = game.add.audio('music');
@@ -94,9 +110,9 @@ weapon.bulletSpeed = 800;
 weapon.fireRate = 120;
 weapon.trackSprite(player,0,0,true);
 
-// TIMERS
+// SPAWN
 game.time.events.loop(1500,this.spawnEnemy,this);
-game.time.events.loop(800,this.spawnAsteroids,this);
+game.time.events.loop(700,this.spawnAsteroids,this);
 
 game.input.onDown.add(this.handleInput,this);
 
@@ -108,12 +124,10 @@ update: function(){
 
 if(vida <= 0){ this.dead(); return; }
 
-// MOVIMIENTO CORRECTO
+// MOVIMIENTO
 if(game.input.activePointer.isDown){
-
 game.physics.arcade.accelerateToPointer(player, game.input.activePointer, 600);
 player.rotation = game.physics.arcade.angleToPointer(player);
-
 }else{
 player.body.acceleration.set(0);
 }
@@ -139,65 +153,68 @@ game.world.wrap(player,16);
 
 updateEnemies: function(){
 
+// ENEMY 1
 for(let i=enemies.length-1;i>=0;i--){
-
 let e = enemies[i];
 let w = weapons1[i];
 
-if(!e.exists){
-enemies.splice(i,1);
-weapons1.splice(i,1);
-continue;
-}
+if(!e.exists){ enemies.splice(i,1); weapons1.splice(i,1); continue; }
 
-// movimiento hacia jugador
-game.physics.arcade.moveToObject(e,player,150);
-e.rotation = game.physics.arcade.angleBetween(e,player);
+game.physics.arcade.moveToObject(e,player,120);
 
-// disparo
 if(game.time.now > w.nextFire){
 w.fireAtSprite(player);
-
-if(game.rnd.frac()<0.2) sndLaser1.play();
-
+if(Math.random()<0.2) sndLaser1.play();
 w.nextFire = game.time.now + 1200;
 }
 
-// colisiones
-game.physics.arcade.overlap(e,weapon.bullets,this.hitEnemy,null,this);
-game.physics.arcade.overlap(player,w.bullets,this.hitPlayer,null,this);
+this.checkHits(e,w,1);
+}
 
+// ENEMY 2
+for(let i=enemies2.length-1;i>=0;i--){
+let e = enemies2[i];
+let w = weapons2[i];
+
+if(!e.exists){ enemies2.splice(i,1); weapons2.splice(i,1); continue; }
+
+game.physics.arcade.moveToObject(e,player,250);
+
+if(game.time.now > w.nextFire){
+w.fireAtSprite(player);
+if(Math.random()<0.3) sndLaser2.play();
+w.nextFire = game.time.now + 500;
+}
+
+this.checkHits(e,w,2);
+}
+
+// ENEMY 3
+for(let i=enemies3.length-1;i>=0;i--){
+let e = enemies3[i];
+let w = weapons3[i];
+
+if(!e.exists){ enemies3.splice(i,1); weapons3.splice(i,1); continue; }
+
+game.physics.arcade.moveToObject(e,player,80);
+
+if(game.time.now > w.nextFire){
+for(let a=0;a<360;a+=30){
+let b = w.fire();
+if(b) game.physics.arcade.velocityFromAngle(a,400,b.body.velocity);
+}
+sndLaser3.play();
+w.nextFire = game.time.now + 2000;
+}
+
+this.checkHits(e,w,3);
 }
 
 },
 
-spawnEnemy: function(){
+checkHits: function(e,w,type){
 
-let pos = this.spawnFueraPantalla();
-this.createEnemy(pos.x,pos.y);
-
-},
-
-createEnemy: function(x,y){
-
-let e = game.add.sprite(x,y,'enemy',0);
-game.physics.arcade.enable(e);
-e.anchor.set(0.5);
-e.hp = 1;
-
-let w = game.add.weapon(10,'laser1');
-w.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
-w.bulletLifespan = 1200;
-w.trackSprite(e,0,0,true);
-w.nextFire = 0;
-
-enemies.push(e);
-weapons1.push(w);
-
-},
-
-hitEnemy: function(enemy,bullet){
-
+game.physics.arcade.overlap(e,weapon.bullets,(enemy,bullet)=>{
 bullet.kill();
 enemy.hp--;
 
@@ -205,26 +222,94 @@ if(enemy.hp <= 0){
 enemy.kill();
 sndExplosion.play();
 counter++;
+
+if(type==1){
+kills1++;
+if(kills1 % 5 === 0){
+let p = this.spawnFueraPantalla();
+this.createEnemy(2,p.x,p.y);
 }
+}
+
+if(type==2){
+kills2++;
+if(kills2 % 5 === 0){
+let p = this.spawnFueraPantalla();
+this.createEnemy(3,p.x,p.y);
+}
+}
+
+if(type==3){
+vida = Math.min(maxVida, vida*2);
+}
+
+}
+
+},null,this);
+
+game.physics.arcade.overlap(player,w.bullets,this.hitPlayer,null,this);
+
+},
+
+spawnEnemy: function(){
+let pos = this.spawnFueraPantalla();
+this.createEnemy(1,pos.x,pos.y);
+},
+
+createEnemy: function(type,x,y){
+
+let key = type==1?'enemy':type==2?'enemy2':'enemy3';
+
+let e = game.add.sprite(x,y,key,0);
+game.physics.arcade.enable(e);
+e.anchor.set(0.5);
+
+e.hp = type==1?1:type==2?3:5;
+
+let bulletKey = type==1?'laser1':type==2?'laser2':'laser3';
+
+let w = game.add.weapon(10,bulletKey);
+w.trackSprite(e,0,0,true);
+w.nextFire = 0;
+
+if(type==1){ enemies.push(e); weapons1.push(w); }
+if(type==2){ enemies2.push(e); weapons2.push(w); }
+if(type==3){ enemies3.push(e); weapons3.push(w); }
 
 },
 
 hitPlayer: function(player,bullet){
-
 bullet.kill();
 vida -= 10;
 sndExplosion.play();
-
 },
 
 // ================= ASTEROIDES =================
 
 spawnAsteroids: function(){
 
-if(Math.random()<0.7){
-this.createAst2();
-}
+let r = Math.random();
 
+if(r < 0.6) this.createAst2();
+else if(r < 0.85) this.createAst1();
+else this.createAst3();
+
+},
+
+createAst1: function(){
+
+let pos = this.spawnFueraPantalla();
+let a = game.add.sprite(pos.x,pos.y,'asteroide');
+game.physics.arcade.enable(a);
+
+let scale = game.rnd.realInRange(0.5,1.5);
+a.scale.set(scale);
+
+a.hp = Math.floor(3 * scale);
+
+game.physics.arcade.velocityFromAngle(game.rnd.angle(),50,a.body.velocity);
+
+ast1.push(a);
 },
 
 createAst2: function(){
@@ -233,34 +318,41 @@ let pos = this.spawnFueraPantalla();
 let a = game.add.sprite(pos.x,pos.y,'asteroide2');
 game.physics.arcade.enable(a);
 
-let speed = game.rnd.integerInRange(200,800);
+let scale = game.rnd.frac()<0.8 ? 0.3 : game.rnd.realInRange(1,4);
+a.scale.set(scale);
 
-// dirección aleatoria REAL (antes solo X)
-let angle = game.rnd.angle();
-game.physics.arcade.velocityFromAngle(angle, speed, a.body.velocity);
+let speed = 800 - (scale*150);
+game.physics.arcade.velocityFromAngle(game.rnd.angle(),speed,a.body.velocity);
 
 ast2.push(a);
+},
 
+createAst3: function(){
+
+let pos = this.spawnFueraPantalla();
+let a = game.add.sprite(pos.x,pos.y,'asteroide3');
+game.physics.arcade.enable(a);
+
+let scale = game.rnd.realInRange(3,6);
+a.scale.set(scale);
+
+a.hp = Math.floor(10 + scale*5);
+a.body.mass = scale*5;
+
+game.physics.arcade.velocityFromAngle(game.rnd.angle(),30,a.body.velocity);
+
+ast3.push(a);
 },
 
 updateAsteroids: function(){
 
-for(let i=ast2.length-1;i>=0;i--){
-
-let a = ast2[i];
-
-if(!a.exists){
-ast2.splice(i,1);
-continue;
-}
-
+ast2.forEach(a=>{
 game.physics.arcade.overlap(player,a,()=>{
 vida -=5;
 a.kill();
 sndExplosion.play();
 });
-
-}
+});
 
 },
 
@@ -283,12 +375,8 @@ this.fire();
 },
 
 fire: function(){
-
 let b = weapon.fire();
-if(b){
-sndLaser.play();
-}
-
+if(b) sndLaser.play();
 },
 
 // ================= UTIL =================
@@ -305,8 +393,6 @@ return {x:player.x+game.rnd.integerInRange(-margin,margin),y:player.y-2000};
 
 },
 
-// ================= DEAD =================
-
 dead: function(){
 
 music.stop();
@@ -320,11 +406,8 @@ let txt = game.add.text(game.camera.width/2,game.camera.height/2,
 txt.anchor.set(0.5);
 txt.fixedToCamera = true;
 
-// RESTART LIMPIO
 game.input.onDown.removeAll();
-game.input.onDown.addOnce(()=>{
-game.state.restart(true,false);
-});
+game.input.onDown.addOnce(()=>game.state.restart(true,false));
 
 }
 
