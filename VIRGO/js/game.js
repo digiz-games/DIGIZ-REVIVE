@@ -42,7 +42,7 @@ game.load.image('asteroide', 'assets/sprites/asteroide.png');
 game.load.image('asteroide2', 'assets/sprites/asteroide2.png');
 game.load.image('asteroide3', 'assets/sprites/asteroide3.png');
 
-game.load.audio('laser', 'assets/audio/laser.wav');
+game.load.audio('laser', 'assets/audio/laser.mp3');
 game.load.audio('laser1', 'assets/audio/laser1.mp3');
 game.load.audio('laser2', 'assets/audio/laser2.mp3');
 game.load.audio('laser3', 'assets/audio/laser3.mp3');
@@ -104,9 +104,9 @@ update: function(){
 
 if(vida <= 0){ this.dead(); return; }
 
-// MOVIMIENTO
+// ✅ MOVIMIENTO ARREGLADO
 if(game.input.activePointer.isDown){
-game.physics.arcade.accelerateToPointer(player,null,600);
+game.physics.arcade.accelerateToPointer(player, game.input.activePointer, 600);
 player.rotation = game.physics.arcade.angleToPointer(player);
 }
 
@@ -131,7 +131,6 @@ game.world.wrap(player,16);
 
 updateEnemies: function(){
 
-// ENEMIES1 → rodean
 for(let i=enemies.length-1;i>=0;i--){
 
 let e = enemies[i];
@@ -143,25 +142,17 @@ weapons1.splice(i,1);
 continue;
 }
 
-// movimiento circular
-let angle = game.time.now * 0.001 + i;
-let tx = player.x + Math.cos(angle)*250;
-let ty = player.y + Math.sin(angle)*250;
+game.physics.arcade.moveToObject(e,player,120);
 
-game.physics.arcade.moveToXY(e,tx,ty,120);
-e.rotation = game.physics.arcade.angleBetween(e,player);
-
-// disparo simple
 if(game.time.now > w.nextFire){
-w.fireAtSprite(player);
-sndLaser1.play();
+let b = w.fireAtSprite(player);
+if(b) sndLaser1.play();
 w.nextFire = game.time.now + 1200;
 }
 
 this.checkHits(e,w);
 }
 
-// ENEMIES2 → persecución agresiva
 for(let i=enemies2.length-1;i>=0;i--){
 
 let e = enemies2[i];
@@ -174,9 +165,7 @@ continue;
 }
 
 game.physics.arcade.moveToObject(e,player,300);
-e.rotation = game.physics.arcade.angleBetween(e,player);
 
-// disparo tipo shotgun corto
 if(game.time.now > w.nextFire){
 
 for(let a=-20;a<=20;a+=10){
@@ -193,7 +182,6 @@ w.nextFire = game.time.now + 400;
 this.checkHits(e,w);
 }
 
-// ENEMIES3 → guardianes
 for(let i=enemies3.length-1;i>=0;i--){
 
 let e = enemies3[i];
@@ -205,21 +193,11 @@ weapons3.splice(i,1);
 continue;
 }
 
-// movimiento lento
-if(!e.nextMove || game.time.now > e.nextMove){
-let ang = game.rnd.angle();
-game.physics.arcade.velocityFromAngle(ang,80,e.body.velocity);
-e.nextMove = game.time.now + 2000;
-}
-
-e.rotation = game.physics.arcade.angleBetween(e,player);
-
-// activación por cercanía
 let dist = game.physics.arcade.distanceBetween(e,player);
 
 if(dist < 400 && game.time.now > w.nextFire){
 
-for(let a=0;a<360;a+=15){
+for(let a=0;a<360;a+=20){
 let b = w.fire();
 if(b){
 game.physics.arcade.velocityFromAngle(a,400,b.body.velocity);
@@ -247,17 +225,6 @@ spawnEnemy: function(){
 let pos = this.spawnFueraPantalla();
 this.createEnemy(1,pos.x,pos.y);
 
-// evolución
-if(counter % 5 == 0){
-let p = this.spawnFueraPantalla();
-this.createEnemy(2,p.x,p.y);
-}
-
-if(counter % 25 == 0){
-let p = this.spawnFueraPantalla();
-this.createEnemy(3,p.x,p.y);
-}
-
 },
 
 createEnemy: function(type,x,y){
@@ -267,8 +234,6 @@ let key = type==1?'enemy':type==2?'enemy2':'enemy3';
 let e = game.add.sprite(x,y,key);
 game.physics.arcade.enable(e);
 e.anchor.set(0.5);
-
-if(type==3) e.scale.set(2);
 
 let bulletKey = type==1?'laser1':type==2?'laser2':'laser3';
 
@@ -292,11 +257,6 @@ enemy.kill();
 sndExplosion.play();
 
 counter++;
-
-// bonus vida por enemy3
-if(enemies3.includes(enemy)){
-vida = Math.min(maxVida, vida*2);
-}
 
 },
 
@@ -398,8 +358,8 @@ this.fire();
 
 fire: function(){
 
-weapon.fire();
-sndLaser.play();
+let b = weapon.fire();
+if(b) sndLaser.play();
 
 },
 
@@ -417,15 +377,13 @@ return {x:player.x+game.rnd.integerInRange(-margin,margin),y:player.y-2000};
 
 },
 
-// ================= DEAD =================
-
 dead: function(){
 
 music.stop();
 
 let tiempo = Math.floor((game.time.now - startTime)/1000);
 
-let txt = game.add.text(player.x,player.y,
+let txt = game.add.text(game.camera.width/2,game.camera.height/2,
 "GAME OVER\n\nScore: "+counter+"\nTiempo: "+tiempo+"s\n\nToca para reiniciar",
 {font:"40px Arial",fill:"#fff",align:"center"});
 
