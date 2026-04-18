@@ -1,12 +1,21 @@
 var player;
-var asteroides;
 
 var enemies = [];
+var enemies2 = [];
+var enemies3 = [];
+
 var enemyWeapons = [];
+var enemyWeapons2 = [];
+var enemyWeapons3 = [];
 
 var vida;
 var vidabar;
 var counter = 0;
+
+var kills1 = 0;
+var kills2 = 0;
+
+var spawnMultiplier = 1;
 
 var laser;
 var laserEnemy;
@@ -24,12 +33,14 @@ var Game = {
 
     game.load.image('space', 'assets/space_bg.jpg');
     game.load.spritesheet('ship', 'assets/sprites/nave.png', 64, 64, 5);
-    game.load.image('bullet', 'assets/sprites/laser2.png');
-    game.load.spritesheet('lasers', 'assets/sprites/lasers.png', 32, 14, 12);
 
-    game.load.image('asteroide', 'assets/sprites/asteroide.png');
-    game.load.image('vida', 'assets/sprites/vida.jpg');
+    game.load.image('bullet', 'assets/sprites/laser2.png');
+
     game.load.spritesheet('enemy', 'assets/sprites/enemy.png', 64, 64, 5);
+    game.load.spritesheet('enemy2', 'assets/sprites/enemy2.png', 64, 64, 5);
+    game.load.spritesheet('enemy3', 'assets/sprites/enemy3.png', 64, 64, 5);
+
+    game.load.image('vida', 'assets/sprites/vida.jpg');
 
     game.load.audio('laser', ['assets/audio/laser.wav']);
     game.load.audio('laser1', ['assets/audio/laser1.wav']);
@@ -41,11 +52,19 @@ var Game = {
 
   create: function(){
 
-    // 🔥 LIMPIEZA TOTAL (FIX PANTALLA NEGRA)
     game.world.removeAll();
 
     enemies = [];
+    enemies2 = [];
+    enemies3 = [];
+
     enemyWeapons = [];
+    enemyWeapons2 = [];
+    enemyWeapons3 = [];
+
+    kills1 = 0;
+    kills2 = 0;
+    spawnMultiplier = 1;
 
     game.physics.startSystem(Phaser.Physics.ARCADE);
     game.world.setBounds(0, 0, 2000, 2000);
@@ -59,35 +78,28 @@ var Game = {
     virgo_song.loop = true;
     virgo_song.play();
 
-    // PLAYER
     player = game.add.sprite(500, 500, 'ship');
     game.physics.arcade.enable(player);
     player.anchor.set(0.5);
-
-    // 🔥 INERCIA
     player.body.drag.set(120);
     player.body.maxVelocity.set(400);
 
     game.camera.follow(player);
 
-    // WEAPON PLAYER
     weapon = game.add.weapon(30, 'bullet');
     weapon.bulletSpeed = 700;
     weapon.fireRate = 120;
     weapon.trackSprite(player, 0, 0, true);
 
-    // VIDA
     vida = 200;
     vidabar = game.add.sprite(50, 10, 'vida');
     vidabar.fixedToCamera = true;
 
-    // SCORE
     text = game.add.text(game.width/2, 20, 'Score: 0', { font: "30px Arial", fill: "#fff" });
     text.anchor.set(0.5);
     text.fixedToCamera = true;
 
-    // SPAWN
-    game.time.events.loop(Phaser.Timer.SECOND * 1.5, this.crearEnemy, this);
+    game.time.events.loop(Phaser.Timer.SECOND * 1.5, this.spawnEnemies, this);
 
     game.input.onDown.add(this.handleInput, this);
   },
@@ -103,57 +115,139 @@ var Game = {
 
     var pointer = game.input.activePointer;
 
-    // 🔥 MOVIMIENTO CON INERCIA
     if(pointer.isDown){
-
       game.physics.arcade.accelerateToPointer(player, pointer, 600);
-
       player.rotation = game.physics.arcade.angleToPointer(player);
-
     }
 
-    // ENEMIGOS
-    for (var i = enemies.length - 1; i >= 0; i--){
+    this.updateEnemies(enemies, enemyWeapons, 120);
+    this.updateEnemies(enemies2, enemyWeapons2, 180);
+    this.updateEnemies(enemies3, enemyWeapons3, 400);
 
-        var e = enemies[i];
-        var w = enemyWeapons[i];
+    game.world.wrap(player, 16);
+  },
+
+  updateEnemies: function(list, weapons, speed){
+
+    for (var i = list.length - 1; i >= 0; i--){
+
+        var e = list[i];
+        var w = weapons[i];
 
         if(!e || !e.exists){
-            enemies.splice(i,1);
-            enemyWeapons.splice(i,1);
+            list.splice(i,1);
+            weapons.splice(i,1);
             continue;
         }
 
-        game.physics.arcade.moveToObject(e, player, 120);
+        game.physics.arcade.moveToObject(e, player, speed);
         e.rotation = game.physics.arcade.angleBetween(e, player);
 
-        // DISPARO ENEMIGO
         if(w && game.time.now > w.nextFire){
             w.fireAtSprite(player);
-            w.nextFire = game.time.now + 1000;
-            laserEnemy.play();
+            w.nextFire = game.time.now + w.fireRate;
         }
 
-        // COLISIONES
-        game.physics.arcade.overlap(e, weapon.bullets, this.colisionenemy, null, this);
+        game.physics.arcade.overlap(e, weapon.bullets, this.hitEnemy, null, this);
         game.physics.arcade.overlap(player, w.bullets, this.hitPlayer, null, this);
     }
+  },
 
-    game.world.wrap(player, 16);
+  spawnEnemies: function(){
+
+    // ENEMIES (BÁSICOS)
+    for(let i=0;i<spawnMultiplier;i++){
+      this.createEnemyType(1);
+    }
+  },
+
+  createEnemyType: function(type){
+
+    var spriteKey = type === 1 ? 'enemy' : type === 2 ? 'enemy2' : 'enemy3';
+
+    var e = game.add.sprite(
+      game.rnd.integerInRange(0, 2000),
+      game.rnd.integerInRange(0, 2000),
+      spriteKey
+    );
+
+    game.physics.arcade.enable(e);
+    e.anchor.set(0.5);
+
+    var w = game.add.weapon(10, 'bullet');
+
+    if(type === 1){
+      w.bulletSpeed = 400;
+      w.fireRate = 1200;
+      enemies.push(e);
+      enemyWeapons.push(w);
+    }
+
+    if(type === 2){
+      w.bulletSpeed = 500;
+      w.fireRate = 700; // 🔥 más disparos
+      enemies2.push(e);
+      enemyWeapons2.push(w);
+    }
+
+    if(type === 3){
+      w.bulletSpeed = 600;
+      w.fireRate = 700;
+      enemies3.push(e);
+      enemyWeapons3.push(w);
+    }
+
+    w.trackSprite(e, 0, 0, true);
+    w.nextFire = 0;
+  },
+
+  hitEnemy: function(enemy, bullet){
+
+    bullet.kill();
+    enemy.kill();
+
+    counter++;
+    text.setText('Score: ' + counter);
+
+    game.sound.play('explosion');
+
+    // 🔥 IDENTIFICAR TIPO
+    if(enemies.includes(enemy)){
+        kills1++;
+
+        if(kills1 % 5 === 0){
+            this.createEnemyType(2);
+        }
+
+        if(kills1 % 10 === 0){
+            spawnMultiplier++;
+        }
+    }
+
+    if(enemies2.includes(enemy)){
+        kills2++;
+
+        if(kills2 % 5 === 0){
+            this.createEnemyType(3);
+        }
+    }
+  },
+
+  hitPlayer: function(player, bullet){
+    bullet.kill();
+    vida -= 10;
   },
 
   handleInput: function(pointer){
 
     var now = new Date().getTime();
 
-    // DOBLE TAP
     if(now - lastTap < 300){
         this.fire();
     }
 
     lastTap = now;
 
-    // CLICK PC
     if(pointer.leftButton && pointer.leftButton.isDown){
         this.fire();
     }
@@ -166,52 +260,9 @@ var Game = {
     }
   },
 
-  crearEnemy: function(){
-
-    if(enemies.length > 25) return; // 🔥 límite seguro
-
-    var enemy = game.add.sprite(
-      game.rnd.integerInRange(0, 2000),
-      game.rnd.integerInRange(0, 2000),
-      'enemy'
-    );
-
-    game.physics.arcade.enable(enemy);
-    enemy.anchor.set(0.5);
-
-    // 🔥 ARMA ENEMIGO
-    var w = game.add.weapon(10, 'bullet');
-    w.bulletSpeed = 400;
-    w.fireRate = 1000;
-    w.trackSprite(enemy, 0, 0, true);
-    w.nextFire = 0;
-
-    enemies.push(enemy);
-    enemyWeapons.push(w);
-  },
-
-  colisionenemy: function(enemy, bullet){
-
-    bullet.kill();
-    enemy.kill();
-
-    counter++;
-    text.setText('Score: ' + counter);
-
-    game.sound.play('explosion');
-  },
-
-  hitPlayer: function(player, bullet){
-    bullet.kill();
-    vida -= 10;
-  },
-
   dead: function(){
-
     virgo_song.stop();
     game.sound.play('explosion');
-
-    // 🔥 RESET LIMPIO
     game.state.restart(true, false);
   }
 
