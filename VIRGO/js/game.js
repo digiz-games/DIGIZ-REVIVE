@@ -24,7 +24,6 @@ var vidaBar;
 var music;
 var sndLaser, sndLaser1, sndLaser2, sndLaser3, sndExplosion;
 
-
 // ================= GAME =================
 var Game = {
 
@@ -55,7 +54,6 @@ game.load.audio('music', 'assets/audio/virgo_song.mp3');
 
 },
 
-// ================= CREATE =================
 create: function(){
 
 game.world.removeAll();
@@ -86,8 +84,7 @@ music = game.add.audio('music');
 music.volume = 0.9;
 music.loopFull();
 
-
-// ================= PLAYER =================
+// PLAYER
 player = game.add.sprite(10000,10000,'ship',0);
 game.physics.arcade.enable(player);
 player.anchor.set(0.5);
@@ -96,19 +93,17 @@ player.body.maxVelocity.set(500);
 
 game.camera.follow(player);
 
-
-// ================= UI =================
+// UI
 scoreText = game.add.text(20,20,'Score: 0',{font:'20px Arial',fill:'#fff'});
 scoreText.fixedToCamera = true;
 
 vidaBar = game.add.graphics(20,50);
 vidaBar.fixedToCamera = true;
 
-
-// ================= WEAPON PLAYER (OPTIMIZADO) =================
-weapon = game.add.weapon(60,'bullet');
-
-weapon.bulletKillType = Phaser.Weapon.KILL_WORLD_BOUNDS;
+// WEAPON PLAYER
+weapon = game.add.weapon(40,'bullet');
+weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
+weapon.bulletLifespan = 150;
 weapon.bulletSpeed = 1800;
 weapon.fireRate = 120;
 weapon.trackSprite(player,0,0,true);
@@ -118,8 +113,7 @@ weapon.bullets.setAll('checkWorldBounds', true);
 weapon.bullets.setAll('outOfBoundsKill', true);
 weapon.autoExpandBullets = false;
 
-
-// ================= SPAWN =================
+// SPAWN
 game.time.events.loop(1500,this.spawnEnemy,this);
 game.time.events.loop(700,this.spawnAsteroids,this);
 
@@ -129,11 +123,9 @@ startTime = game.time.now;
 
 },
 
-// ================= UPDATE =================
 update: function(){
 
 if(vida <= 0){ this.dead(); return; }
-
 
 // MOVIMIENTO
 if(game.input.activePointer.isDown){
@@ -143,25 +135,18 @@ player.rotation = game.physics.arcade.angleToPointer(player);
 player.body.acceleration.set(0);
 }
 
-
-// LOGICA
 this.updateEnemies();
 this.updateAsteroids();
 
-
-// UI
 scoreText.text = "Score: " + counter;
 
 vidaBar.clear();
 vidaBar.beginFill(0xff0000);
 vidaBar.drawRect(0,0,200*(vida/maxVida),10);
 
-
-// WORLD WRAP
 game.world.wrap(player,16);
 
-
-// 🔥 LIMPIEZA CRÍTICA
+// 🔥 LIMPIEZA
 this.cleanArrays();
 
 },
@@ -169,49 +154,137 @@ this.cleanArrays();
 // ================= CLEAN =================
 cleanArrays: function(){
 
-enemies = enemies.filter(e=>e.exists);
-enemies2 = enemies2.filter(e=>e.exists);
-enemies3 = enemies3.filter(e=>e.exists);
+enemies = enemies.filter(e => e.exists);
+enemies2 = enemies2.filter(e => e.exists);
+enemies3 = enemies3.filter(e => e.exists);
 
-ast1 = ast1.filter(a=>a.exists);
-ast2 = ast2.filter(a=>a.exists);
-ast3 = ast3.filter(a=>a.exists);
+ast1 = ast1.filter(a => a.exists);
+ast2 = ast2.filter(a => a.exists);
+ast3 = ast3.filter(a => a.exists);
+
+weapons1 = weapons1.filter(w => w);
+weapons2 = weapons2.filter(w => w);
+weapons3 = weapons3.filter(w => w);
 
 },
 
-// ================= INPUT =================
-handleInput: function(pointer){
+// ================= ENEMIES =================
+updateEnemies: function(){
 
-let now = Date.now();
+this.updateEnemyGroup(enemies,weapons1,120,1200,0.2,1);
+this.updateEnemyGroup(enemies2,weapons2,300,500,0.3,2);
+this.updateEnemy3();
 
-if(now - lastTap < 300){
-this.fire();
+},
+
+updateEnemyGroup: function(list,weapons,speed,rate,prob,type){
+
+for(let i=list.length-1;i>=0;i--){
+
+let e = list[i];
+let w = weapons[i];
+
+if(!e || !e.exists) continue;
+
+game.physics.arcade.moveToObject(e,player,speed);
+e.rotation = game.physics.arcade.angleBetween(e,player);
+
+if(game.time.now > w.nextFire){
+w.fireAtSprite(player);
+if(Math.random()<prob){
+if(type==1) sndLaser1.play();
+if(type==2) sndLaser2.play();
+}
+w.nextFire = game.time.now + rate;
 }
 
-lastTap = now;
+this.checkHits(e,w,type);
 
-if(pointer.leftButton && pointer.leftButton.isDown){
-this.fire();
 }
 
 },
 
-fire: function(){
-let b = weapon.fire();
-if(b) sndLaser.play();
+updateEnemy3: function(){
+
+for(let i=enemies3.length-1;i>=0;i--){
+
+let e = enemies3[i];
+let w = weapons3[i];
+
+if(!e || !e.exists) continue;
+
+game.physics.arcade.moveToObject(e,player,80);
+e.rotation = game.physics.arcade.angleBetween(e,player);
+
+if(game.time.now > w.nextFire){
+
+for(let a=0;a<360;a+=30){
+let b = w.fire();
+if(b){
+game.physics.arcade.velocityFromAngle(a,500,b.body.velocity);
+}
+}
+
+sndLaser3.play();
+w.nextFire = game.time.now + 2000;
+}
+
+this.checkHits(e,w,3);
+
+}
+
 },
 
-// ================= SPAWN ENEMY =================
+checkHits: function(e,w,type){
+
+game.physics.arcade.overlap(e,weapon.bullets,(enemy,bullet)=>{
+
+bullet.kill();
+enemy.hp--;
+
+if(enemy.hp <= 0){
+
+enemy.kill();
+sndExplosion.play();
+counter++;
+
+if(type==1){
+kills1++;
+if(kills1 % 5 === 0){
+let p = this.spawnFueraPantalla();
+this.createEnemy(2,p.x,p.y);
+}
+}
+
+if(type==2){
+kills2++;
+if(kills2 % 5 === 0){
+let p = this.spawnFueraPantalla();
+this.createEnemy(3,p.x,p.y);
+}
+}
+
+if(type==3){
+vida = Math.min(maxVida, vida*2);
+}
+
+}
+
+},null,this);
+
+if(w && w.bullets){
+game.physics.arcade.overlap(player,w.bullets,this.hitPlayer,null,this);
+}
+
+},
+
 spawnEnemy: function(){
-
-if(enemies.length + enemies2.length + enemies3.length > 60) return;
 
 let pos = this.spawnFueraPantalla();
 this.createEnemy(1,pos.x,pos.y);
 
 },
 
-// ================= CREATE ENEMY =================
 createEnemy: function(type,x,y){
 
 let key = type==1?'enemy':type==2?'enemy2':'enemy3';
@@ -227,18 +300,14 @@ e.hp = type==1?1:type==2?3:5;
 let bulletKey = type==1?'laser1':type==2?'laser2':'laser3';
 
 let w = game.add.weapon(20,bulletKey);
-
-w.bulletKillType = Phaser.Weapon.KILL_WORLD_BOUNDS;
 w.trackSprite(e,0,0,true);
 
-// 🔥 FIX LAG
-w.bullets.setAll('checkWorldBounds', true);
-w.bullets.setAll('outOfBoundsKill', true);
+w.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
 w.autoExpandBullets = false;
 
-if(type==1){ w.bulletSpeed=600; }
-if(type==2){ w.bulletSpeed=1600; }
-if(type==3){ w.bulletSpeed=200; }
+if(type==1){ w.bulletSpeed=600; w.bulletLifespan=10; }
+if(type==2){ w.bulletSpeed=1600; w.bulletLifespan=30; }
+if(type==3){ w.bulletSpeed=200; w.bulletLifespan=2500; }
 
 w.nextFire = 0;
 
@@ -248,10 +317,13 @@ if(type==3){ enemies3.push(e); weapons3.push(w); }
 
 },
 
-// ================= ASTEROIDES =================
-spawnAsteroids: function(){
+hitPlayer: function(player,bullet){
+bullet.kill();
+vida -= 10;
+sndExplosion.play();
+},
 
-if(ast1.length + ast2.length + ast3.length > 80) return;
+spawnAsteroids: function(){
 
 let r = Math.random();
 
@@ -261,7 +333,65 @@ else this.createAst3();
 
 },
 
-// ================= DEAD =================
+createAst1: function(){ let pos = this.spawnFueraPantalla();
+let a = game.add.sprite(pos.x,pos.y,'asteroide');
+game.physics.arcade.enable(a);
+a.scale.set(game.rnd.realInRange(0.5,1.5));
+ast1.push(a); },
+
+createAst2: function(){ let pos = this.spawnFueraPantalla();
+let a = game.add.sprite(pos.x,pos.y,'asteroide2');
+game.physics.arcade.enable(a);
+ast2.push(a); },
+
+createAst3: function(){ let pos = this.spawnFueraPantalla();
+let a = game.add.sprite(pos.x,pos.y,'asteroide3');
+game.physics.arcade.enable(a);
+ast3.push(a); },
+
+updateAsteroids: function(){
+
+ast1.forEach(a=>{
+if(!a) return;
+game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{ b.kill(); a.hp--; if(a.hp<=0){a.kill(); sndExplosion.play();}});
+});
+
+ast3.forEach(a=>{
+if(!a) return;
+game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{ b.kill(); a.hp--; if(a.hp<=0){a.kill(); sndExplosion.play();}});
+});
+
+},
+
+handleInput: function(pointer){
+
+let now = Date.now();
+
+if(now - lastTap < 300) this.fire();
+
+lastTap = now;
+
+if(pointer.leftButton && pointer.leftButton.isDown) this.fire();
+
+},
+
+fire: function(){
+let b = weapon.fire();
+if(b) sndLaser.play();
+},
+
+spawnFueraPantalla: function(){
+
+let side = Math.floor(Math.random()*4);
+let margin = 800;
+
+if(side==0) return {x:player.x+2000,y:player.y+game.rnd.integerInRange(-margin,margin)};
+if(side==1) return {x:player.x-2000,y:player.y+game.rnd.integerInRange(-margin,margin)};
+if(side==2) return {x:player.x+game.rnd.integerInRange(-margin,margin),y:player.y+2000};
+return {x:player.x+game.rnd.integerInRange(-margin,margin),y:player.y-2000};
+
+},
+
 dead: function(){
 
 music.stop();
