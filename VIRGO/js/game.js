@@ -104,8 +104,8 @@ vidaBar.fixedToCamera = true;
 // WEAPON PLAYER
 weapon = game.add.weapon(40,'bullet');
 weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
-weapon.bulletLifespan = 500;
-weapon.bulletSpeed = 2000;
+weapon.bulletLifespan = 50;
+weapon.bulletSpeed = 1600;
 weapon.fireRate = 120;
 weapon.trackSprite(player,0,0,true);
 
