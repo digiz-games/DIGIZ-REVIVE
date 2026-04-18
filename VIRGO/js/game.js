@@ -92,7 +92,7 @@ player = game.add.sprite(10000,10000,'ship',0);
 game.physics.arcade.enable(player);
 
 player.anchor.set(0.5);
-player.body.drag.set(200);              // 🔥 MÁS FRENO (clave)
+player.body.drag.set(80);
 player.body.maxVelocity.set(500);
 
 game.camera.follow(player);
@@ -136,32 +136,28 @@ update: function(){
 if(vida <= 0){ this.dead(); return; }
 
 
-// ================= MOVIMIENTO (FIX NAVE PEGADA) =================
-let pointer = game.input.activePointer;
+// ================= MOVIMIENTO (FIX DEFINITIVO SIN PEGUE) =================
+var p = game.input.activePointer;
 
-if(pointer.isDown){
+if(p.isDown){
 
-// aceleración suave
-game.physics.arcade.accelerateToPointer(player, pointer, 500);
+var angle = game.physics.arcade.angleToPointer(player);
 
-player.rotation = game.physics.arcade.angleToPointer(player);
+player.body.velocity.x = Math.cos(angle) * 500;
+player.body.velocity.y = Math.sin(angle) * 500;
+
+player.rotation = angle;
 
 }else{
 
-// 🔥 CLAVE: freno REAL cuando no hay input
-player.body.velocity.x *= 0.90;
-player.body.velocity.y *= 0.90;
+player.body.velocity.x *= 0.85;
+player.body.velocity.y *= 0.85;
 
 player.body.acceleration.set(0);
 }
 
 
-// ================= HARD CLAMP VELOCITY =================
-player.body.velocity.x = Phaser.Math.clamp(player.body.velocity.x, -500, 500);
-player.body.velocity.y = Phaser.Math.clamp(player.body.velocity.y, -500, 500);
-
-
-// ================= SYSTEM =================
+// ================= GAME SYSTEM =================
 this.updateEnemies();
 this.updateAsteroids();
 
@@ -338,41 +334,42 @@ vida -= 10;
 sndExplosion.play();
 },
 
-// ================= ASTEROIDES (SIN ROMPER) =================
+// ================= ASTEROIDES (NO TOCADOS IMPORTANTE) =================
 updateAsteroids: function(){
 
-for(let i=ast1.length-1;i>=0;i--){
-let a = ast1[i];
-if(!a || !a.exists){ ast1.splice(i,1); continue; }
-
-game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
-b.kill();
-a.hp = (a.hp||3)-1;
-if(a.hp<=0){ a.kill(); sndExplosion.play(); }
-});
-
+ast1.forEach(a=>{
 game.physics.arcade.collide(player,a);
-}
-
-for(let i=ast3.length-1;i>=0;i--){
-let a = ast3[i];
-if(!a || !a.exists){ ast3.splice(i,1); continue; }
-
-game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
-b.kill();
-a.hp = (a.hp||10)-1;
-if(a.hp<=0){ a.kill(); sndExplosion.play(); }
 });
 
+ast3.forEach(a=>{
 game.physics.arcade.collide(player,a,function(p,a){
 a.body.velocity.x *= 0.2;
 a.body.velocity.y *= 0.2;
 });
-}
+});
+
+ast1.forEach(a=>{
+game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
+b.kill(); a.hp--; if(a.hp<=0){a.kill(); sndExplosion.play();}
+});
+});
+
+ast3.forEach(a=>{
+game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
+b.kill(); a.hp--; if(a.hp<=0){a.kill(); sndExplosion.play();}
+});
+});
+
+ast2.forEach(a=>{
+game.physics.arcade.overlap(player,a,()=>{
+vida -= 5;
+a.kill();
+sndExplosion.play();
+});
+});
 
 },
 
-// ================= INPUT =================
 handleInput: function(pointer){
 
 let now = Date.now();
