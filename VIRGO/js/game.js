@@ -370,7 +370,7 @@ a.scale.set(scale);
 
 a.hp = Math.floor(10 + scale*5);
 
-a.body.mass = scale * 30;
+a.body.mass = scale * 40;
 a.body.bounce.set(0.05);
 
 a.body.velocity.set(
@@ -378,7 +378,7 @@ game.rnd.integerInRange(-10,10),
 game.rnd.integerInRange(-10,10)
 );
 
-a.body.drag.set(50);
+a.body.drag.set(60);
   
 ast3.push(a);
 
