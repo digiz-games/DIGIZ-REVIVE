@@ -386,32 +386,70 @@ ast3.push(a);
 
 updateAsteroids: function(){
 
-// colisiones físicas
-ast1.forEach(a=> game.physics.arcade.collide(player,a));
-ast3.forEach(a=> game.physics.arcade.collide(player,a));
+// ================= COLISIONES =================
 
-// daño y destrucción
+// ast1 normales
 ast1.forEach(a=>{
-game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
-b.kill(); a.hp--;
-if(a.hp<=0){ a.kill(); sndExplosion.play(); }
-});
+    game.physics.arcade.collide(player,a);
 });
 
+// ast3 pesados (con amortiguación real)
 ast3.forEach(a=>{
-game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
-b.kill(); a.hp--;
-if(a.hp<=0){ a.kill(); sndExplosion.play(); }
+    game.physics.arcade.collide(player,a, function(player, a){
+
+        // 🔥 mata el impulso acumulado
+        a.body.velocity.x *= 0.2;
+        a.body.velocity.y *= 0.2;
+
+    });
 });
+
+
+// ================= LIMITADOR DE VELOCIDAD =================
+
+ast3.forEach(a => {
+
+    let maxSpeed = 40;
+
+    a.body.velocity.x = Phaser.Math.clamp(a.body.velocity.x, -maxSpeed, maxSpeed);
+    a.body.velocity.y = Phaser.Math.clamp(a.body.velocity.y, -maxSpeed, maxSpeed);
+
+});
+
+
+// ================= DAÑO Y DESTRUCCIÓN =================
+
+// ast1 destrucción
+ast1.forEach(a=>{
+    game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
+        b.kill(); 
+        a.hp--;
+        if(a.hp<=0){ 
+            a.kill(); 
+            sndExplosion.play(); 
+        }
+    });
+});
+
+// ast3 destrucción
+ast3.forEach(a=>{
+    game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
+        b.kill(); 
+        a.hp--;
+        if(a.hp<=0){ 
+            a.kill(); 
+            sndExplosion.play(); 
+        }
+    });
 });
 
 // ast2 destructivo
 ast2.forEach(a=>{
-game.physics.arcade.overlap(player,a,()=>{
-vida-=5;
-a.kill();
-sndExplosion.play();
-});
+    game.physics.arcade.overlap(player,a,()=>{
+        vida -= 5;
+        a.kill();
+        sndExplosion.play();
+    });
 });
 
 },
