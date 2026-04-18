@@ -1,10 +1,10 @@
 // ================= VARIABLES =================
 var player;
 
-var enemies = [], enemies2 = [], enemies3 = [];
-var weapons1 = [], weapons2 = [], weapons3 = [];
+var enemies = [];
+var weapons1 = [];
 
-var ast1 = [], ast2 = [], ast3 = [];
+var ast2 = [];
 
 var vida = 200;
 var maxVida = 200;
@@ -19,7 +19,7 @@ var scoreText;
 var vidaBar;
 
 var music;
-var sndLaser, sndLaser1, sndLaser2, sndLaser3, sndExplosion;
+var sndLaser, sndLaser1, sndExplosion;
 
 // ================= GAME =================
 var Game = {
@@ -30,22 +30,14 @@ game.load.image('space', 'assets/space_bg.jpg');
 game.load.spritesheet('ship', 'assets/sprites/nave.png', 64, 64);
 
 game.load.spritesheet('enemy', 'assets/sprites/enemy.png',64,64);
-game.load.spritesheet('enemy2', 'assets/sprites/enemy2.png',64,64);
-game.load.spritesheet('enemy3', 'assets/sprites/enemy3.png',64,64);
 
 game.load.image('bullet', 'assets/sprites/laser.png');
 game.load.image('laser1', 'assets/sprites/laser1.png');
-game.load.image('laser2', 'assets/sprites/laser2.png');
-game.load.image('laser3', 'assets/sprites/laser3.png');
 
-game.load.image('asteroide', 'assets/sprites/asteroide.png');
 game.load.image('asteroide2', 'assets/sprites/asteroide2.png');
-game.load.image('asteroide3', 'assets/sprites/asteroide3.png');
 
 game.load.audio('laser', 'assets/audio/laser.mp3');
 game.load.audio('laser1', 'assets/audio/laser1.mp3');
-game.load.audio('laser2', 'assets/audio/laser2.mp3');
-game.load.audio('laser3', 'assets/audio/laser3.mp3');
 game.load.audio('explosion', 'assets/audio/explosion.wav');
 game.load.audio('music', 'assets/audio/virgo_song.mp3');
 
@@ -58,9 +50,9 @@ game.world.removeAll();
 game.time.events.removeAll();
 game.input.onDown.removeAll();
 
-enemies = []; enemies2 = []; enemies3 = [];
-weapons1 = []; weapons2 = []; weapons3 = [];
-ast1 = []; ast2 = []; ast3 = [];
+enemies = [];
+weapons1 = [];
+ast2 = [];
 
 vida = maxVida;
 counter = 0;
@@ -72,12 +64,10 @@ game.add.tileSprite(0,0,20000,20000,'space');
 // AUDIO
 sndLaser = game.add.audio('laser'); sndLaser.volume = 0.4;
 sndLaser1 = game.add.audio('laser1'); sndLaser1.volume = 0.15;
-sndLaser2 = game.add.audio('laser2'); sndLaser2.volume = 0.15;
-sndLaser3 = game.add.audio('laser3'); sndLaser3.volume = 0.15;
 sndExplosion = game.add.audio('explosion');
 
 music = game.add.audio('music');
-music.volume = 0.8;
+music.volume = 0.9;
 music.loopFull();
 
 // PLAYER
@@ -86,7 +76,6 @@ game.physics.arcade.enable(player);
 player.anchor.set(0.5);
 player.body.drag.set(80);
 player.body.maxVelocity.set(500);
-player.body.collideWorldBounds = false;
 
 game.camera.follow(player);
 
@@ -99,6 +88,8 @@ vidaBar.fixedToCamera = true;
 
 // WEAPON PLAYER
 weapon = game.add.weapon(40,'bullet');
+weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
+weapon.bulletLifespan = 1000;
 weapon.bulletSpeed = 800;
 weapon.fireRate = 120;
 weapon.trackSprite(player,0,0,true);
@@ -106,7 +97,6 @@ weapon.trackSprite(player,0,0,true);
 // TIMERS
 game.time.events.loop(1500,this.spawnEnemy,this);
 game.time.events.loop(800,this.spawnAsteroids,this);
-game.time.events.loop(7000,this.meteorShower,this);
 
 game.input.onDown.add(this.handleInput,this);
 
@@ -118,12 +108,10 @@ update: function(){
 
 if(vida <= 0){ this.dead(); return; }
 
-// MOVIMIENTO CORREGIDO
+// MOVIMIENTO CORRECTO
 if(game.input.activePointer.isDown){
 
-let pointer = game.input.activePointer;
-
-game.physics.arcade.accelerateToPointer(player, pointer, 600);
+game.physics.arcade.accelerateToPointer(player, game.input.activePointer, 600);
 player.rotation = game.physics.arcade.angleToPointer(player);
 
 }else{
@@ -152,35 +140,45 @@ game.world.wrap(player,16);
 updateEnemies: function(){
 
 for(let i=enemies.length-1;i>=0;i--){
+
 let e = enemies[i];
 let w = weapons1[i];
 
-if(!e.exists){ enemies.splice(i,1); weapons1.splice(i,1); continue; }
+if(!e.exists){
+enemies.splice(i,1);
+weapons1.splice(i,1);
+continue;
+}
 
-game.physics.arcade.moveToObject(e,player,120);
+// movimiento hacia jugador
+game.physics.arcade.moveToObject(e,player,150);
+e.rotation = game.physics.arcade.angleBetween(e,player);
 
+// disparo
 if(game.time.now > w.nextFire){
 w.fireAtSprite(player);
+
 if(game.rnd.frac()<0.2) sndLaser1.play();
+
 w.nextFire = game.time.now + 1200;
 }
 
-this.checkHits(e,w);
+// colisiones
+game.physics.arcade.overlap(e,weapon.bullets,this.hitEnemy,null,this);
+game.physics.arcade.overlap(player,w.bullets,this.hitPlayer,null,this);
+
 }
 
 },
 
-checkHits: function(e,w){
-game.physics.arcade.overlap(e,weapon.bullets,this.hitEnemy,null,this);
-game.physics.arcade.overlap(player,w.bullets,this.hitPlayer,null,this);
-},
-
 spawnEnemy: function(){
+
 let pos = this.spawnFueraPantalla();
-this.createEnemy(1,pos.x,pos.y);
+this.createEnemy(pos.x,pos.y);
+
 },
 
-createEnemy: function(type,x,y){
+createEnemy: function(x,y){
 
 let e = game.add.sprite(x,y,'enemy',0);
 game.physics.arcade.enable(e);
@@ -188,6 +186,8 @@ e.anchor.set(0.5);
 e.hp = 1;
 
 let w = game.add.weapon(10,'laser1');
+w.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
+w.bulletLifespan = 1200;
 w.trackSprite(e,0,0,true);
 w.nextFire = 0;
 
@@ -210,15 +210,21 @@ counter++;
 },
 
 hitPlayer: function(player,bullet){
+
 bullet.kill();
 vida -= 10;
 sndExplosion.play();
+
 },
 
 // ================= ASTEROIDES =================
 
 spawnAsteroids: function(){
-if(Math.random()<0.7) this.createAst2();
+
+if(Math.random()<0.7){
+this.createAst2();
+}
+
 },
 
 createAst2: function(){
@@ -228,28 +234,33 @@ let a = game.add.sprite(pos.x,pos.y,'asteroide2');
 game.physics.arcade.enable(a);
 
 let speed = game.rnd.integerInRange(200,800);
-a.body.velocity.x = speed;
+
+// dirección aleatoria REAL (antes solo X)
+let angle = game.rnd.angle();
+game.physics.arcade.velocityFromAngle(angle, speed, a.body.velocity);
 
 ast2.push(a);
-},
-
-meteorShower: function(){
-
-for(let i=0;i<20;i++){
-this.createAst2();
-}
 
 },
 
 updateAsteroids: function(){
 
-ast2.forEach(a=>{
+for(let i=ast2.length-1;i>=0;i--){
+
+let a = ast2[i];
+
+if(!a.exists){
+ast2.splice(i,1);
+continue;
+}
+
 game.physics.arcade.overlap(player,a,()=>{
 vida -=5;
 a.kill();
 sndExplosion.play();
 });
-});
+
+}
 
 },
 
@@ -272,8 +283,12 @@ this.fire();
 },
 
 fire: function(){
-weapon.fire();
+
+let b = weapon.fire();
+if(b){
 sndLaser.play();
+}
+
 },
 
 // ================= UTIL =================
@@ -305,9 +320,9 @@ let txt = game.add.text(game.camera.width/2,game.camera.height/2,
 txt.anchor.set(0.5);
 txt.fixedToCamera = true;
 
-// FIX REAL RESTART
+// RESTART LIMPIO
 game.input.onDown.removeAll();
-game.input.onDown.addOnce(function(){
+game.input.onDown.addOnce(()=>{
 game.state.restart(true,false);
 });
 
