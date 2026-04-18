@@ -45,6 +45,20 @@ body {
 
 <body>
 
+<!-- Música -->
+<audio id="musica" autoplay loop>
+    <source src="cancion.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+// Forzar reproducción en navegadores que bloquean autoplay
+document.addEventListener("click", function() {
+    const audio = document.getElementById("musica");
+    audio.play();
+}, { once: true });
+</script>
+
+    
 <div class="contenido">
 DIGIZ 
 Games 
