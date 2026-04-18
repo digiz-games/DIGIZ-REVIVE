@@ -370,8 +370,8 @@ a.scale.set(scale);
 
 a.hp = Math.floor(10 + scale*5);
 
-a.body.mass = scale * 10;
-a.body.bounce.set(0.2);
+a.body.mass = scale * 30;
+a.body.bounce.set(0.05);
 
 a.body.velocity.set(
 game.rnd.integerInRange(-30,30),
