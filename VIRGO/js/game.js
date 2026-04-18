@@ -92,7 +92,7 @@ player = game.add.sprite(10000,10000,'ship',0);
 game.physics.arcade.enable(player);
 
 player.anchor.set(0.5);
-player.body.drag.set(80);
+player.body.drag.set(200);              // 🔥 MÁS FRENO (clave)
 player.body.maxVelocity.set(500);
 
 game.camera.follow(player);
@@ -106,7 +106,7 @@ vidaBar = game.add.graphics(20,50);
 vidaBar.fixedToCamera = true;
 
 
-// ================= WEAPON PLAYER (FIX LAG) =================
+// ================= WEAPON =================
 weapon = game.add.weapon(40,'bullet');
 
 weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
@@ -136,16 +136,32 @@ update: function(){
 if(vida <= 0){ this.dead(); return; }
 
 
-// ================= MOVIMIENTO =================
-if(game.input.activePointer.isDown){
-game.physics.arcade.accelerateToPointer(player, game.input.activePointer, 600);
+// ================= MOVIMIENTO (FIX NAVE PEGADA) =================
+let pointer = game.input.activePointer;
+
+if(pointer.isDown){
+
+// aceleración suave
+game.physics.arcade.accelerateToPointer(player, pointer, 500);
+
 player.rotation = game.physics.arcade.angleToPointer(player);
+
 }else{
+
+// 🔥 CLAVE: freno REAL cuando no hay input
+player.body.velocity.x *= 0.90;
+player.body.velocity.y *= 0.90;
+
 player.body.acceleration.set(0);
 }
 
 
-// ================= SYSTEMS =================
+// ================= HARD CLAMP VELOCITY =================
+player.body.velocity.x = Phaser.Math.clamp(player.body.velocity.x, -500, 500);
+player.body.velocity.y = Phaser.Math.clamp(player.body.velocity.y, -500, 500);
+
+
+// ================= SYSTEM =================
 this.updateEnemies();
 this.updateAsteroids();
 
@@ -212,12 +228,14 @@ e.rotation = game.physics.arcade.angleBetween(e,player);
 
 if(game.time.now > w.nextFire){
 
-for(let a=0;a<360;a+=45){ // FIX LAG
+for(let a=0;a<360;a+=45){
+
 let b = w.fire();
 if(b){
 b.lifespan = 2500;
 game.physics.arcade.velocityFromAngle(a,500,b.body.velocity);
 }
+
 }
 
 sndLaser3.play();
@@ -274,10 +292,8 @@ game.physics.arcade.overlap(player,w.bullets,this.hitPlayer,null,this);
 },
 
 spawnEnemy: function(){
-
 let pos = this.spawnFueraPantalla();
 this.createEnemy(1,pos.x,pos.y);
-
 },
 
 createEnemy: function(type,x,y){
@@ -286,6 +302,7 @@ let key = type==1?'enemy':type==2?'enemy2':'enemy3';
 
 let e = game.add.sprite(x,y,key,0);
 game.physics.arcade.enable(e);
+
 e.anchor.set(0.5);
 
 if(type==3) e.scale.set(2.5);
@@ -321,7 +338,7 @@ vida -= 10;
 sndExplosion.play();
 },
 
-// ================= ASTEROIDES (FIXED) =================
+// ================= ASTEROIDES (SIN ROMPER) =================
 updateAsteroids: function(){
 
 for(let i=ast1.length-1;i>=0;i--){
@@ -361,6 +378,7 @@ handleInput: function(pointer){
 let now = Date.now();
 
 if(now - lastTap < 300) this.fire();
+
 lastTap = now;
 
 if(pointer.leftButton && pointer.leftButton.isDown) this.fire();
