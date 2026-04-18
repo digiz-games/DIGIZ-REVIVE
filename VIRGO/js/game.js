@@ -42,7 +42,7 @@ game.load.image('asteroide', 'assets/sprites/asteroide.png');
 game.load.image('asteroide2', 'assets/sprites/asteroide2.png');
 game.load.image('asteroide3', 'assets/sprites/asteroide3.png');
 
-game.load.audio('laser', 'assets/audio/laser.mp3');
+game.load.audio('laser', 'assets/audio/laser.wav');
 game.load.audio('laser1', 'assets/audio/laser1.mp3');
 game.load.audio('laser2', 'assets/audio/laser2.mp3');
 game.load.audio('laser3', 'assets/audio/laser3.mp3');
