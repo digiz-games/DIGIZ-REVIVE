@@ -29,9 +29,9 @@ preload: function(){
 game.load.image('space', 'assets/space_bg.jpg');
 game.load.spritesheet('ship', 'assets/sprites/nave.png', 64, 64);
 
-game.load.image('enemy', 'assets/sprites/enemy.png');
-game.load.image('enemy2', 'assets/sprites/enemy2.png');
-game.load.image('enemy3', 'assets/sprites/enemy3.png');
+game.load.spritesheet('enemy', 'assets/sprites/enemy.png', 64, 64);
+game.load.spritesheet('enemy2', 'assets/sprites/enemy2.png', 64, 64);
+game.load.spritesheet('enemy3', 'assets/sprites/enemy3.png', 64, 64);
 
 game.load.image('bullet', 'assets/sprites/laser.png');
 game.load.image('laser1', 'assets/sprites/laser1.png');
