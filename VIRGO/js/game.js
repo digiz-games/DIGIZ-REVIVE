@@ -12,7 +12,6 @@ var maxVida = 200;
 var weapon;
 var counter = 0;
 
-// 🔥 CONTADORES EVOLUCIÓN
 var kills1 = 0;
 var kills2 = 0;
 
@@ -153,61 +152,74 @@ game.world.wrap(player,16);
 
 updateEnemies: function(){
 
-// ENEMY 1
-for(let i=enemies.length-1;i>=0;i--){
-let e = enemies[i];
-let w = weapons1[i];
+this.updateEnemyGroup(enemies,weapons1,120,1200,0.2,1);
+this.updateEnemyGroup(enemies2,weapons2,300,500,0.3,2);
+this.updateEnemy3();
 
-if(!e.exists){ enemies.splice(i,1); weapons1.splice(i,1); continue; }
+},
 
-game.physics.arcade.moveToObject(e,player,120);
+updateEnemyGroup: function(list,weapons,speed,rate,prob,type){
+
+for(let i=list.length-1;i>=0;i--){
+
+let e = list[i];
+let w = weapons[i];
+
+if(!e.exists){
+list.splice(i,1);
+weapons.splice(i,1);
+continue;
+}
+
+game.physics.arcade.moveToObject(e,player,speed);
+e.rotation = game.physics.arcade.angleBetween(e,player);
 
 if(game.time.now > w.nextFire){
 w.fireAtSprite(player);
-if(Math.random()<0.2) sndLaser1.play();
-w.nextFire = game.time.now + 1200;
+if(Math.random()<prob){
+if(type==1) sndLaser1.play();
+if(type==2) sndLaser2.play();
+}
+w.nextFire = game.time.now + rate;
 }
 
-this.checkHits(e,w,1);
+this.checkHits(e,w,type);
+
 }
 
-// ENEMY 2
-for(let i=enemies2.length-1;i>=0;i--){
-let e = enemies2[i];
-let w = weapons2[i];
+},
 
-if(!e.exists){ enemies2.splice(i,1); weapons2.splice(i,1); continue; }
+updateEnemy3: function(){
 
-game.physics.arcade.moveToObject(e,player,250);
-
-if(game.time.now > w.nextFire){
-w.fireAtSprite(player);
-if(Math.random()<0.3) sndLaser2.play();
-w.nextFire = game.time.now + 500;
-}
-
-this.checkHits(e,w,2);
-}
-
-// ENEMY 3
 for(let i=enemies3.length-1;i>=0;i--){
+
 let e = enemies3[i];
 let w = weapons3[i];
 
-if(!e.exists){ enemies3.splice(i,1); weapons3.splice(i,1); continue; }
+if(!e.exists){
+enemies3.splice(i,1);
+weapons3.splice(i,1);
+continue;
+}
 
 game.physics.arcade.moveToObject(e,player,80);
+e.rotation = game.physics.arcade.angleBetween(e,player);
 
 if(game.time.now > w.nextFire){
+
 for(let a=0;a<360;a+=30){
 let b = w.fire();
-if(b) game.physics.arcade.velocityFromAngle(a,400,b.body.velocity);
+if(b){
+game.physics.arcade.velocityFromAngle(a,500,b.body.velocity);
 }
+}
+
 sndLaser3.play();
 w.nextFire = game.time.now + 2000;
 }
 
 this.checkHits(e,w,3);
+
 }
 
 },
@@ -215,10 +227,12 @@ this.checkHits(e,w,3);
 checkHits: function(e,w,type){
 
 game.physics.arcade.overlap(e,weapon.bullets,(enemy,bullet)=>{
+
 bullet.kill();
 enemy.hp--;
 
 if(enemy.hp <= 0){
+
 enemy.kill();
 sndExplosion.play();
 counter++;
@@ -252,8 +266,10 @@ game.physics.arcade.overlap(player,w.bullets,this.hitPlayer,null,this);
 },
 
 spawnEnemy: function(){
+
 let pos = this.spawnFueraPantalla();
 this.createEnemy(1,pos.x,pos.y);
+
 },
 
 createEnemy: function(type,x,y){
@@ -264,12 +280,19 @@ let e = game.add.sprite(x,y,key,0);
 game.physics.arcade.enable(e);
 e.anchor.set(0.5);
 
+if(type==3) e.scale.set(2.5);
+
 e.hp = type==1?1:type==2?3:5;
 
 let bulletKey = type==1?'laser1':type==2?'laser2':'laser3';
 
-let w = game.add.weapon(10,bulletKey);
+let w = game.add.weapon(20,bulletKey);
 w.trackSprite(e,0,0,true);
+
+if(type==1){ w.bulletSpeed=400; w.bulletLifespan=1200; }
+if(type==2){ w.bulletSpeed=700; w.bulletLifespan=500; }
+if(type==3){ w.bulletSpeed=500; w.bulletLifespan=2500; }
+
 w.nextFire = 0;
 
 if(type==1){ enemies.push(e); weapons1.push(w); }
@@ -307,9 +330,16 @@ a.scale.set(scale);
 
 a.hp = Math.floor(3 * scale);
 
-game.physics.arcade.velocityFromAngle(game.rnd.angle(),50,a.body.velocity);
+a.body.mass = scale * 2;
+a.body.bounce.set(0.6);
+
+a.body.velocity.set(
+game.rnd.integerInRange(-50,50),
+game.rnd.integerInRange(-50,50)
+);
 
 ast1.push(a);
+
 },
 
 createAst2: function(){
@@ -322,9 +352,11 @@ let scale = game.rnd.frac()<0.8 ? 0.3 : game.rnd.realInRange(1,4);
 a.scale.set(scale);
 
 let speed = 800 - (scale*150);
+
 game.physics.arcade.velocityFromAngle(game.rnd.angle(),speed,a.body.velocity);
 
 ast2.push(a);
+
 },
 
 createAst3: function(){
@@ -337,18 +369,44 @@ let scale = game.rnd.realInRange(3,6);
 a.scale.set(scale);
 
 a.hp = Math.floor(10 + scale*5);
-a.body.mass = scale*5;
 
-game.physics.arcade.velocityFromAngle(game.rnd.angle(),30,a.body.velocity);
+a.body.mass = scale * 10;
+a.body.bounce.set(0.2);
+
+a.body.velocity.set(
+game.rnd.integerInRange(-30,30),
+game.rnd.integerInRange(-30,30)
+);
 
 ast3.push(a);
+
 },
 
 updateAsteroids: function(){
 
+// colisiones físicas
+ast1.forEach(a=> game.physics.arcade.collide(player,a));
+ast3.forEach(a=> game.physics.arcade.collide(player,a));
+
+// daño y destrucción
+ast1.forEach(a=>{
+game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
+b.kill(); a.hp--;
+if(a.hp<=0){ a.kill(); sndExplosion.play(); }
+});
+});
+
+ast3.forEach(a=>{
+game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
+b.kill(); a.hp--;
+if(a.hp<=0){ a.kill(); sndExplosion.play(); }
+});
+});
+
+// ast2 destructivo
 ast2.forEach(a=>{
 game.physics.arcade.overlap(player,a,()=>{
-vida -=5;
+vida-=5;
 a.kill();
 sndExplosion.play();
 });
@@ -392,6 +450,8 @@ if(side==2) return {x:player.x+game.rnd.integerInRange(-margin,margin),y:player.
 return {x:player.x+game.rnd.integerInRange(-margin,margin),y:player.y-2000};
 
 },
+
+// ================= DEAD =================
 
 dead: function(){
 
