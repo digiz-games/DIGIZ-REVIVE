@@ -24,6 +24,8 @@ var vidaBar;
 var music;
 var sndLaser, sndLaser1, sndLaser2, sndLaser3, sndExplosion;
 
+var gameOver = false;
+
 // ================= GAME =================
 var Game = {
 
@@ -55,6 +57,8 @@ game.load.audio('music', 'assets/audio/virgo_song.mp3');
 },
 
 create: function(){
+
+gameOver = false;
 
 // LIMPIEZA
 game.world.removeAll();
@@ -120,6 +124,8 @@ startTime = game.time.now;
 },
 
 update: function(){
+
+if(gameOver) return;
 
 if(vida <= 0){ this.dead(); return; }
 
@@ -289,7 +295,8 @@ let bulletKey = type==1?'laser1':type==2?'laser2':'laser3';
 let w = game.add.weapon(20,bulletKey);
 w.trackSprite(e,0,0,true);
 
-if(type==1){ w.bulletSpeed=400; w.bulletLifespan=1200; }
+// 🔥 FIX DISPARO ENEMY1 MÁS CORTO
+if(type==1){ w.bulletSpeed=400; w.bulletLifespan=600; }
 if(type==2){ w.bulletSpeed=700; w.bulletLifespan=500; }
 if(type==3){ w.bulletSpeed=500; w.bulletLifespan=2500; }
 
@@ -325,19 +332,7 @@ let pos = this.spawnFueraPantalla();
 let a = game.add.sprite(pos.x,pos.y,'asteroide');
 game.physics.arcade.enable(a);
 
-let scale = game.rnd.realInRange(0.5,1.5);
-a.scale.set(scale);
-
-a.hp = Math.floor(3 * scale);
-
-a.body.mass = scale * 2;
-a.body.bounce.set(0.6);
-
-a.body.velocity.set(
-game.rnd.integerInRange(-50,50),
-game.rnd.integerInRange(-50,50)
-);
-
+a.hp = 3;
 ast1.push(a);
 
 },
@@ -348,12 +343,7 @@ let pos = this.spawnFueraPantalla();
 let a = game.add.sprite(pos.x,pos.y,'asteroide2');
 game.physics.arcade.enable(a);
 
-let scale = game.rnd.frac()<0.8 ? 0.3 : game.rnd.realInRange(1,4);
-a.scale.set(scale);
-
-let speed = 800 - (scale*150);
-
-game.physics.arcade.velocityFromAngle(game.rnd.angle(),speed,a.body.velocity);
+game.physics.arcade.velocityFromAngle(game.rnd.angle(),600,a.body.velocity);
 
 ast2.push(a);
 
@@ -365,18 +355,12 @@ let pos = this.spawnFueraPantalla();
 let a = game.add.sprite(pos.x,pos.y,'asteroide3');
 game.physics.arcade.enable(a);
 
-let scale = game.rnd.realInRange(3,6);
-a.scale.set(scale);
+// 🔥 ULTRA PESADO
+a.body.mass = 1000;
+a.body.drag.set(300);
+a.body.maxVelocity.set(60);
 
-a.hp = Math.floor(10 + scale*5);
-
-a.body.mass = scale * 10;
-a.body.bounce.set(0.2);
-
-a.body.velocity.set(
-game.rnd.integerInRange(-30,30),
-game.rnd.integerInRange(-30,30)
-);
+a.hp = 20;
 
 ast3.push(a);
 
@@ -384,31 +368,19 @@ ast3.push(a);
 
 updateAsteroids: function(){
 
-// colisiones físicas
-ast1.forEach(a=> game.physics.arcade.collide(player,a));
-ast3.forEach(a=> game.physics.arcade.collide(player,a));
-
-// daño y destrucción
-ast1.forEach(a=>{
-game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
-b.kill(); a.hp--;
-if(a.hp<=0){ a.kill(); sndExplosion.play(); }
+// 🔥 COLISIONES REALES
+ast3.forEach(a=>{
+game.physics.arcade.collide(player,a);
+game.physics.arcade.collide(weapon.bullets,a,(b,a)=>{
+b.kill();
 });
 });
 
+// daño
 ast3.forEach(a=>{
 game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
 b.kill(); a.hp--;
 if(a.hp<=0){ a.kill(); sndExplosion.play(); }
-});
-});
-
-// ast2 destructivo
-ast2.forEach(a=>{
-game.physics.arcade.overlap(player,a,()=>{
-vida-=5;
-a.kill();
-sndExplosion.play();
 });
 });
 
@@ -417,6 +389,8 @@ sndExplosion.play();
 // ================= INPUT =================
 
 handleInput: function(pointer){
+
+if(gameOver) return;
 
 let now = Date.now();
 
@@ -455,7 +429,11 @@ return {x:player.x+game.rnd.integerInRange(-margin,margin),y:player.y-2000};
 
 dead: function(){
 
+gameOver = true;
+
 music.stop();
+game.time.events.pause();
+game.physics.arcade.isPaused = true;
 
 let tiempo = Math.floor((game.time.now - startTime)/1000);
 
@@ -467,7 +445,9 @@ txt.anchor.set(0.5);
 txt.fixedToCamera = true;
 
 game.input.onDown.removeAll();
-game.input.onDown.addOnce(()=>game.state.restart(true,false));
+game.input.onDown.addOnce(()=>{
+game.state.restart(true,false);
+});
 
 }
 
