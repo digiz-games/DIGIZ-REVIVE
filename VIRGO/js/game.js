@@ -237,9 +237,11 @@ enemy.kill();
 sndExplosion.play();
 counter++;
 
+//Cantidad De ENEMIGOS
+  
 if(type==1){
 kills1++;
-if(kills1 % 5 === 0){
+if(kills1 % 3 === 0){
 let p = this.spawnFueraPantalla();
 this.createEnemy(2,p.x,p.y);
 }
@@ -247,7 +249,7 @@ this.createEnemy(2,p.x,p.y);
 
 if(type==2){
 kills2++;
-if(kills2 % 5 === 0){
+if(kills2 % 3 === 0){
 let p = this.spawnFueraPantalla();
 this.createEnemy(3,p.x,p.y);
 }
