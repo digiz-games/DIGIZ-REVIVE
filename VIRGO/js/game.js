@@ -309,7 +309,7 @@ w.trackSprite(e,0,0,true);
 
 w.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
 
-if(type==1){ w.bulletSpeed=300; w.bulletLifespan=60; }
+if(type==1){ w.bulletSpeed=300; w.bulletLifespan=180; }
 if(type==2){ w.bulletSpeed=1800; w.bulletLifespan=120; }
 if(type==3){ w.bulletSpeed=800; w.bulletLifespan=80; }
 
