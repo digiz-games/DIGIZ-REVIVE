@@ -2,8 +2,6 @@ var gameRatio = window.innerWidth/window.innerHeight;
 var game = new Phaser.Game(window.innerWidth, window.innerHeight, Phaser.CANVAS, document.getElementById('game'));
 var firstRunLandscape;
 
-
-
 game.state.add('Menu',Menu);
 game.state.add('Menunivel',Menunivel);
 game.state.add('Nivel1',Nivel1);
@@ -36,28 +34,4 @@ game.state.add('Nivel27',Nivel27);
 game.state.add('Nivel28',Nivel28);
 game.state.add('Nivel29',Nivel29);
 
-
 game.state.start('Menu');
-
-
-var admobid = {};
- if( /(android)/i.test(navigator.userAgent) ) { // for android & amazon-fireos
-   admobid = {
-     banner: 'ca-app-pub-9513537563352766/6593553113', // or DFP format "/6253334/dfp_example_ad"
-     interstitial: 'ca-app-pub-9513537563352766/3009106297'
-   };
-};
-
-if(AdMob) AdMob.createBanner({
-  adId: admobid.banner,
-  position: AdMob.AD_POSITION.TOP_CENTER,
-  autoShow: true });
-
-  if(AdMob) AdMob.prepareInterstitial( {adId:admobid.interstitial, autoShow:false} );
-
-
-document.addEventListener('onAdDismiss', function(e){
-    // handle the event
-    if(AdMob) AdMob.prepareInterstitial( {adId:admobid.interstitial, autoShow:false} );
-
-});
