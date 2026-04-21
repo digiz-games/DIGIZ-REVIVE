@@ -56,7 +56,11 @@ game.load.audio('music', 'assets/audio/virgo_song.mp3');
 
 create: function(){
 
-// RESET LIMPIO
+// LIMPIEZA
+game.world.removeAll();
+game.time.events.removeAll();
+game.input.onDown.removeAll();
+
 enemies = []; enemies2 = []; enemies3 = [];
 weapons1 = []; weapons2 = []; weapons3 = [];
 ast1 = []; ast2 = []; ast3 = [];
@@ -109,7 +113,6 @@ weapon.trackSprite(player,0,0,true);
 game.time.events.loop(1500,this.spawnEnemy,this);
 game.time.events.loop(700,this.spawnAsteroids,this);
 
-// INPUT
 game.input.onDown.add(this.handleInput,this);
 
 startTime = game.time.now;
@@ -128,8 +131,10 @@ player.rotation = game.physics.arcade.angleToPointer(player);
 player.body.acceleration.set(0);
 }
 
-// SISTEMAS
+// ENEMIES
 this.updateEnemies();
+
+// ASTEROIDES
 this.updateAsteroids();
 
 // UI
@@ -141,29 +146,6 @@ vidaBar.drawRect(0,0,200*(vida/maxVida),10);
 
 game.world.wrap(player,16);
 
-},
-
-// ================= INPUT =================
-
-handleInput: function(pointer){
-
-let now = Date.now();
-
-if(now - lastTap < 300){
-this.fire();
-}
-
-lastTap = now;
-
-if(pointer.leftButton && pointer.leftButton.isDown){
-this.fire();
-}
-
-},
-
-fire: function(){
-let b = weapon.fire();
-if(b) sndLaser.play();
 },
 
 // ================= ENEMIES =================
@@ -255,6 +237,8 @@ enemy.kill();
 sndExplosion.play();
 counter++;
 
+//Cantidad De ENEMIGOS
+  
 if(type==1){
 kills1++;
 if(kills1 % 3 === 0){
@@ -307,11 +291,9 @@ let bulletKey = type==1?'laser1':type==2?'laser2':'laser3';
 let w = game.add.weapon(20,bulletKey);
 w.trackSprite(e,0,0,true);
 
-w.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
-
-if(type==1){ w.bulletSpeed=900; w.bulletLifespan=300; }
+if(type==1){ w.bulletSpeed=900; w.bulletLifespan=150; }
 if(type==2){ w.bulletSpeed=1800; w.bulletLifespan=150; }
-if(type==3){ w.bulletSpeed=1800; w.bulletLifespan=150; }
+if(type==3){ w.bulletSpeed=3000; w.bulletLifespan=600; }
 
 w.nextFire = 0;
 
@@ -350,6 +332,9 @@ a.scale.set(scale);
 
 a.hp = Math.floor(3 * scale);
 
+a.body.mass = scale * 2;
+a.body.bounce.set(0.6);
+
 a.body.velocity.set(
 game.rnd.integerInRange(-50,50),
 game.rnd.integerInRange(-50,50)
@@ -365,7 +350,11 @@ let pos = this.spawnFueraPantalla();
 let a = game.add.sprite(pos.x,pos.y,'asteroide2');
 game.physics.arcade.enable(a);
 
-let speed = 600;
+let scale = game.rnd.frac()<0.8 ? 0.3 : game.rnd.realInRange(1,4);
+a.scale.set(scale);
+
+let speed = 800 - (scale*150);
+
 game.physics.arcade.velocityFromAngle(game.rnd.angle(),speed,a.body.velocity);
 
 ast2.push(a);
@@ -381,41 +370,113 @@ game.physics.arcade.enable(a);
 let scale = game.rnd.realInRange(3,6);
 a.scale.set(scale);
 
-a.hp = 20;
+a.hp = Math.floor(10 + scale*5);
+
+a.body.mass = scale * 40;
+a.body.bounce.set(0.05);
 
 a.body.velocity.set(
 game.rnd.integerInRange(-10,10),
 game.rnd.integerInRange(-10,10)
 );
 
+a.body.drag.set(60);
+  
 ast3.push(a);
 
 },
 
 updateAsteroids: function(){
 
+// ================= COLISIONES =================
+
+// ast1 normales
 ast1.forEach(a=>{
-game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
-b.kill(); a.hp--;
-if(a.hp<=0){ a.kill(); sndExplosion.play(); }
-});
+    game.physics.arcade.collide(player,a);
 });
 
-ast2.forEach(a=>{
-game.physics.arcade.overlap(player,a,()=>{
-vida -= 5;
-a.kill();
-sndExplosion.play();
-});
-});
-
+// ast3 pesados (con amortiguación real)
 ast3.forEach(a=>{
-game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
-b.kill(); a.hp--;
-if(a.hp<=0){ a.kill(); sndExplosion.play(); }
-});
+    game.physics.arcade.collide(player,a, function(player, a){
+
+        // 🔥 mata el impulso acumulado
+        a.body.velocity.x *= 0.2;
+        a.body.velocity.y *= 0.2;
+
+    });
 });
 
+
+// ================= LIMITADOR DE VELOCIDAD =================
+
+ast3.forEach(a => {
+
+    let maxSpeed = 40;
+
+    a.body.velocity.x = Phaser.Math.clamp(a.body.velocity.x, -maxSpeed, maxSpeed);
+    a.body.velocity.y = Phaser.Math.clamp(a.body.velocity.y, -maxSpeed, maxSpeed);
+
+});
+
+
+// ================= DAÑO Y DESTRUCCIÓN =================
+
+// ast1 destrucción
+ast1.forEach(a=>{
+    game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
+        b.kill(); 
+        a.hp--;
+        if(a.hp<=0){ 
+            a.kill(); 
+            sndExplosion.play(); 
+        }
+    });
+});
+
+// ast3 destrucción
+ast3.forEach(a=>{
+    game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
+        b.kill(); 
+        a.hp--;
+        if(a.hp<=0){ 
+            a.kill(); 
+            sndExplosion.play(); 
+        }
+    });
+});
+
+// ast2 destructivo
+ast2.forEach(a=>{
+    game.physics.arcade.overlap(player,a,()=>{
+        vida -= 5;
+        a.kill();
+        sndExplosion.play();
+    });
+});
+
+},
+
+// ================= INPUT =================
+
+handleInput: function(pointer){
+
+let now = Date.now();
+
+if(now - lastTap < 300){
+this.fire();
+}
+
+lastTap = now;
+
+if(pointer.leftButton && pointer.leftButton.isDown){
+this.fire();
+}
+
+},
+
+fire: function(){
+let b = weapon.fire();
+if(b) sndLaser.play();
 },
 
 // ================= UTIL =================
