@@ -291,7 +291,7 @@ let bulletKey = type==1?'laser1':type==2?'laser2':'laser3';
 let w = game.add.weapon(20,bulletKey);
 w.trackSprite(e,0,0,true);
 
-if(type==1){ w.bulletSpeed=900; w.bulletLifespan=150; }
+if(type==1){ w.bulletSpeed=450; w.bulletLifespan=50; }
 if(type==2){ w.bulletSpeed=1800; w.bulletLifespan=150; }
 if(type==3){ w.bulletSpeed=3000; w.bulletLifespan=600; }
 
