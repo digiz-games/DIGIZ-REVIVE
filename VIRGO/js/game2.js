@@ -48,6 +48,11 @@ bg.isPickable = false;
 
 // ===== PLAYER =====
 player = createSprite("assets/sprites/nave.png",4);
+
+if(!player){
+    throw new Error("❌ player no se creó");
+}
+
 player.position = new BABYLON.Vector3(0,0,0);
 
 // ===== INPUT =====
