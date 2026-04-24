@@ -1,15 +1,13 @@
 const canvas = document.getElementById("renderCanvas");
 const engine = new BABYLON.Engine(canvas, true);
 
-let scene, player, camera, ui;
+let scene, player, camera;
 
 let enemies = [];
 let bulletsPlayer = [], bulletsEnemy = [];
 
-let vida = 200, maxVida = 200;
-let score = 0;
-
 let shooting = false;
+let score = 0;
 
 // ================= SCENE =================
 const createScene = () => {
@@ -17,12 +15,12 @@ const createScene = () => {
 scene = new BABYLON.Scene(engine);
 scene.clearColor = new BABYLON.Color4(0,0,0,1);
 
-// ===== CÁMARA 2D =====
+// ===== CÁMARA ORTHO =====
 camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
 camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
 
-let ratio = engine.getRenderWidth()/engine.getRenderHeight();
 let size = 50;
+let ratio = engine.getRenderWidth()/engine.getRenderHeight();
 
 camera.orthoLeft = -size * ratio;
 camera.orthoRight = size * ratio;
@@ -34,14 +32,14 @@ camera.inputs.clear();
 // ===== LUZ =====
 new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
-// ===== FONDO (PICKABLE + TILE) =====
-let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:500},scene);
+// ===== FONDO REALMENTE GRANDE =====
+let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:2000},scene);
 
 let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
 let bgTex = new BABYLON.Texture("assets/space_bg.jpg",scene);
 
-bgTex.uScale = 20;
-bgTex.vScale = 20;
+bgTex.uScale = 100;
+bgTex.vScale = 100;
 
 bgMat.diffuseTexture = bgTex;
 bgMat.emissiveTexture = bgTex;
@@ -50,15 +48,11 @@ bgMat.disableLighting = true;
 bg.material = bgMat;
 bg.position.z = 10;
 
-// 🔥 CLAVE
-bg.isPickable = true;
-bg.name = "bg";
-
 // ===== PLAYER =====
 player = createSprite("assets/sprites/nave.png",4);
-player.position = new BABYLON.Vector3(0,0,0);
+player.position = BABYLON.Vector3.Zero();
 
-// ===== INPUT (solo disparo) =====
+// ===== INPUT =====
 scene.onPointerObservable.add((pointerInfo)=>{
 
 if(pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN){
@@ -71,47 +65,40 @@ if(pointerInfo.type === BABYLON.PointerEventTypes.POINTERUP){
 
 });
 
-// ===== UI =====
-createUI();
-
 // ===== LOOP =====
 scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
 
-// ===== MOUSE REAL EN MUNDO =====
-let mouse = getMouseWorld();
-
-// ===== DIRECCIÓN =====
-let dir = mouse.subtract(player.position);
-
-if(dir.length() > 0.1){
-    dir = dir.normalize();
-}
-
-// ===== MOVIMIENTO =====
-player.position.addInPlace(dir.scale(25*dt));
-
-// ===== ROTACIÓN =====
-player.rotation.z = Math.atan2(dir.y, dir.x);
-
-// ===== CÁMARA SIGUE =====
+// cámara sigue player
 camera.position.x = player.position.x;
 camera.position.y = player.position.y;
 
-// ===== FONDO INFINITO REAL =====
-bg.material.diffuseTexture.uOffset = player.position.x * 0.01;
-bg.material.diffuseTexture.vOffset = player.position.y * 0.01;
+// fondo sigue cámara
+bg.position.x = player.position.x;
+bg.position.y = player.position.y;
 
-// ===== DISPARO =====
-if(shooting){
-    shootPlayer(dir);
+// ================= MOVIMIENTO CONTINUO REAL =================
+let pick = scene.pick(scene.pointerX, scene.pointerY);
+
+if(pick.hit){
+    let target = pick.pickedPoint;
+    let dir = target.subtract(player.position);
+
+    if(dir.length() > 0.1){
+        dir.normalize();
+        player.position.addInPlace(dir.scale(30 * dt));
+
+        player.rotation.z = Math.atan2(dir.y, dir.x);
+    }
 }
+
+// ================= DISPARO =================
+if(shooting) shootPlayer();
 
 // UPDATE
 updateBullets(dt);
 updateEnemies(dt);
-updateUI();
 
 });
 
@@ -126,15 +113,16 @@ function createSprite(texture,size){
 let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
 
 let mat = new BABYLON.StandardMaterial("mat",scene);
+
 let tex = new BABYLON.Texture(texture,scene);
 
 tex.hasAlpha = true;
 
-let frameSize = 64;
+let frame = 64;
 
 tex.onLoadObservable.add(()=>{
-    tex.uScale = frameSize / tex.getSize().width;
-    tex.vScale = frameSize / tex.getSize().height;
+    tex.uScale = frame / tex.getSize().width;
+    tex.vScale = frame / tex.getSize().height;
 });
 
 mat.diffuseTexture = tex;
@@ -149,33 +137,25 @@ m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 return m;
 }
 
-// ================= INPUT =================
-function getMouseWorld(){
-
-let pick = scene.pick(scene.pointerX, scene.pointerY, (mesh)=> mesh.name === "bg");
-
-if(pick.hit){
-    return pick.pickedPoint;
-}
-
-return player.position.clone();
-
-}
-
 // ================= PLAYER =================
-function shootPlayer(dir){
+function shootPlayer(){
 
-if(!shootPlayer.lastTime) shootPlayer.lastTime = 0;
+if(!shootPlayer.last) shootPlayer.last = 0;
+if(Date.now() - shootPlayer.last < 120) return;
 
-if(Date.now() - shootPlayer.lastTime < 120) return;
-
-shootPlayer.lastTime = Date.now();
+shootPlayer.last = Date.now();
 
 let b = createSprite("assets/sprites/laser.png",1);
 b.position = player.position.clone();
 b.position.z = -1;
 
-b.dir = dir.clone();
+let pick = scene.pick(scene.pointerX, scene.pointerY);
+
+if(pick.hit){
+    b.dir = pick.pickedPoint.subtract(player.position).normalize();
+}else{
+    b.dir = new BABYLON.Vector3(1,0,0);
+}
 
 bulletsPlayer.push(b);
 }
@@ -199,19 +179,21 @@ enemies.push(e);
 
 function updateEnemies(dt){
 
-enemies.forEach((e,i)=>{
+for(let i = enemies.length-1; i>=0; i--){
+
+let e = enemies[i];
 
 let dir = player.position.subtract(e.position).normalize();
 e.position.addInPlace(dir.scale(12*dt));
 
-// disparo enemigo
+// disparo
 if(Date.now()-e.lastFire > 1000){
 
 let b = createSprite("assets/sprites/laser1.png",1);
 b.position = e.position.clone();
 b.position.z = -1;
 
-b.dir = dir.clone();
+b.dir = player.position.subtract(e.position).normalize();
 
 bulletsEnemy.push(b);
 
@@ -219,11 +201,13 @@ e.lastFire = Date.now();
 }
 
 // HIT
-bulletsPlayer.forEach((b,bi)=>{
+for(let j = bulletsPlayer.length-1; j>=0; j--){
+let b = bulletsPlayer[j];
+
 if(dist(e,b)<2){
 
 b.dispose();
-bulletsPlayer.splice(bi,1);
+bulletsPlayer.splice(j,1);
 
 e.hp--;
 
@@ -231,66 +215,58 @@ if(e.hp<=0){
 e.dispose();
 enemies.splice(i,1);
 score++;
+break;
 }
 
 }
-});
+}
 
-});
+}
 
 // HIT PLAYER
-bulletsEnemy.forEach((b,bi)=>{
+for(let i = bulletsEnemy.length-1; i>=0; i--){
+let b = bulletsEnemy[i];
+
 if(dist(player,b)<2){
 
-vida -= 10;
 b.dispose();
-bulletsEnemy.splice(bi,1);
+bulletsEnemy.splice(i,1);
 
 }
-});
-
 }
-
-// ================= UI =================
-function createUI(){
-
-ui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("ui");
-
-let text = new BABYLON.GUI.TextBlock();
-text.color = "white";
-text.fontSize = 24;
-text.top = "-45%";
-text.left = "-45%";
-
-ui.addControl(text);
-ui.score = text;
 
 }
 
-function updateUI(){
-ui.score.text = "Score: " + score;
-}
-
-// ================= UTILS =================
-function dist(a,b){
-return BABYLON.Vector3.Distance(a.position,b.position);
-}
-
+// ================= BULLETS =================
 function updateBullets(dt){
 
-[bulletsPlayer,bulletsEnemy].forEach(list=>{
-list.forEach((b,i)=>{
+for(let i = bulletsPlayer.length-1; i>=0; i--){
+let b = bulletsPlayer[i];
 
 b.position.addInPlace(b.dir.scale(60*dt));
 
 if(BABYLON.Vector3.Distance(player.position,b.position)>120){
 b.dispose();
-list.splice(i,1);
+bulletsPlayer.splice(i,1);
+}
 }
 
-});
-});
+for(let i = bulletsEnemy.length-1; i>=0; i--){
+let b = bulletsEnemy[i];
 
+b.position.addInPlace(b.dir.scale(60*dt));
+
+if(BABYLON.Vector3.Distance(player.position,b.position)>120){
+b.dispose();
+bulletsEnemy.splice(i,1);
+}
+}
+
+}
+
+// ================= UTILS =================
+function dist(a,b){
+return BABYLON.Vector3.Distance(a.position,b.position);
 }
 
 function spawnOutside(){
