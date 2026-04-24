@@ -10,6 +10,7 @@ let vida = 200, maxVida = 200;
 let score = 0;
 
 let shooting = false;
+let moveDir = new BABYLON.Vector3(0,0,0);
 
 // ================= SCENE =================
 const createScene = () => {
@@ -17,7 +18,7 @@ const createScene = () => {
 scene = new BABYLON.Scene(engine);
 scene.clearColor = new BABYLON.Color4(0,0,0,1);
 
-// ===== CÁMARA 2D =====
+// ===== CÁMARA =====
 camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
 camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
 
@@ -34,7 +35,7 @@ camera.inputs.clear();
 // ===== LUZ =====
 new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
-// ===== FONDO INFINITO =====
+// ===== FONDO REAL INFINITO =====
 let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:500},scene);
 
 let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
@@ -54,23 +55,15 @@ bg.position.z = 10;
 player = createSprite("assets/sprites/nave.png",4);
 player.position = new BABYLON.Vector3(0,0,0);
 
-// ===== INPUT SOLO DISPARO =====
+// ===== INPUT =====
 scene.onPointerObservable.add((pointerInfo)=>{
 
-switch(pointerInfo.type){
+if(pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN){
+    if(pointerInfo.event.button === 0) shooting = true;
+}
 
-case BABYLON.PointerEventTypes.POINTERDOWN:
-    if(pointerInfo.event.button === 0){
-        shooting = true;
-    }
-break;
-
-case BABYLON.PointerEventTypes.POINTERUP:
-    if(pointerInfo.event.button === 0){
-        shooting = false;
-    }
-break;
-
+if(pointerInfo.type === BABYLON.PointerEventTypes.POINTERUP){
+    if(pointerInfo.event.button === 0) shooting = false;
 }
 
 });
@@ -83,31 +76,31 @@ scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
 
-// 📌 cámara sigue al player
+// ===== DIRECCIÓN (IMPORTANTE) =====
+let mouse = getMouseWorld();
+moveDir = mouse.subtract(player.position);
+
+if(moveDir.length() > 0.1){
+    moveDir.normalize();
+}
+
+// ===== MOVIMIENTO (TIPO PHASER) =====
+player.position.addInPlace(moveDir.scale(25*dt));
+
+// ===== ROTACIÓN =====
+player.rotation.z = Math.atan2(moveDir.y, moveDir.x);
+
+// ===== CÁMARA SIGUE =====
 camera.position.x = player.position.x;
 camera.position.y = player.position.y;
 
-// 📌 fondo sigue cámara (efecto infinito)
-bg.position.x = player.position.x;
-bg.position.y = player.position.y;
+// ===== FONDO SE MUEVE (TEXTURA) =====
+bg.material.diffuseTexture.uOffset = player.position.x * 0.01;
+bg.material.diffuseTexture.vOffset = player.position.y * 0.01;
 
-// ================= MOVIMIENTO (SIN CLICK) =================
-let target = getMouseWorld();
-let dir = target.subtract(player.position);
-
-if(dir.length() > 0.1){
-    dir = dir.normalize();
-    player.position.addInPlace(dir.scale(25*dt));
-}
-
-// ROTACIÓN
-if(dir.length() > 0.1){
-    player.rotation.z = Math.atan2(dir.y, dir.x);
-}
-
-// ================= DISPARO =================
+// ===== DISPARO =====
 if(shooting){
-    shootPlayer();
+    shootPlayer(moveDir);
 }
 
 // UPDATE
@@ -129,25 +122,16 @@ let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
 
 let mat = new BABYLON.StandardMaterial("mat",scene);
 
-let tex = new BABYLON.Texture(
-texture,
-scene,
-false,
-false,
-BABYLON.Texture.NEAREST_SAMPLINGMODE,
-()=>{
-
-let frameSize = 64;
-let texW = tex.getSize().width;
-let texH = tex.getSize().height;
-
-tex.uScale = frameSize / texW;
-tex.vScale = frameSize / texH;
-
-}
-);
+let tex = new BABYLON.Texture(texture,scene);
 
 tex.hasAlpha = true;
+
+let frameSize = 64;
+
+tex.onLoadObservable.add(()=>{
+    tex.uScale = frameSize / tex.getSize().width;
+    tex.vScale = frameSize / tex.getSize().height;
+});
 
 mat.diffuseTexture = tex;
 mat.emissiveColor = new BABYLON.Color3(1,1,1);
@@ -169,11 +153,9 @@ return new BABYLON.Vector3(x,y,0);
 }
 
 // ================= PLAYER =================
-function shootPlayer(){
+function shootPlayer(dir){
 
-// 🔥 rate simple
 if(!shootPlayer.lastTime) shootPlayer.lastTime = 0;
-
 if(Date.now() - shootPlayer.lastTime < 120) return;
 
 shootPlayer.lastTime = Date.now();
@@ -182,7 +164,8 @@ let b = createSprite("assets/sprites/laser.png",1);
 b.position = player.position.clone();
 b.position.z = -1;
 
-b.dir = getMouseWorld().subtract(player.position).normalize();
+// 🔥 usa dirección fija (no recalcula cada frame)
+b.dir = dir.clone();
 
 bulletsPlayer.push(b);
 }
@@ -218,7 +201,7 @@ let b = createSprite("assets/sprites/laser1.png",1);
 b.position = e.position.clone();
 b.position.z = -1;
 
-b.dir = player.position.subtract(e.position).normalize();
+b.dir = dir.clone();
 
 bulletsEnemy.push(b);
 
