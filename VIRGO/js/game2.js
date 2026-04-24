@@ -15,7 +15,7 @@ const createScene = () => {
 scene = new BABYLON.Scene(engine);
 scene.clearColor = new BABYLON.Color4(0,0,0,1);
 
-// ===== CÁMARA ORTHO =====
+// ===== CÁMARA =====
 camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
 camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
 
@@ -32,14 +32,15 @@ camera.inputs.clear();
 // ===== LUZ =====
 new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
-// ===== FONDO REALMENTE GRANDE =====
+// ===== FONDO GRANDE REAL =====
 let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:2000},scene);
 
 let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
 let bgTex = new BABYLON.Texture("assets/space_bg.jpg",scene);
 
-bgTex.uScale = 100;
-bgTex.vScale = 100;
+// 🔥 TEXTURA GRANDE (no mosaico chico)
+bgTex.uScale = 1;
+bgTex.vScale = 1;
 
 bgMat.diffuseTexture = bgTex;
 bgMat.emissiveTexture = bgTex;
@@ -74,26 +75,27 @@ let dt = engine.getDeltaTime()/1000;
 camera.position.x = player.position.x;
 camera.position.y = player.position.y;
 
-// fondo sigue cámara
+// fondo sigue player
 bg.position.x = player.position.x;
 bg.position.y = player.position.y;
 
-// ================= MOVIMIENTO CONTINUO REAL =================
+// ===== MOVIMIENTO CONTINUO =====
 let pick = scene.pick(scene.pointerX, scene.pointerY);
 
 if(pick.hit){
-    let target = pick.pickedPoint;
-    let dir = target.subtract(player.position);
 
-    if(dir.length() > 0.1){
-        dir.normalize();
-        player.position.addInPlace(dir.scale(30 * dt));
+let target = pick.pickedPoint;
+let dir = target.subtract(player.position);
 
-        player.rotation.z = Math.atan2(dir.y, dir.x);
-    }
+if(dir.length() > 0.1){
+dir.normalize();
+player.position.addInPlace(dir.scale(30 * dt));
+player.rotation.z = Math.atan2(dir.y, dir.x);
 }
 
-// ================= DISPARO =================
+}
+
+// ===== DISPARO =====
 if(shooting) shootPlayer();
 
 // UPDATE
@@ -113,14 +115,13 @@ function createSprite(texture,size){
 let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
 
 let mat = new BABYLON.StandardMaterial("mat",scene);
-
 let tex = new BABYLON.Texture(texture,scene);
 
 tex.hasAlpha = true;
 
-let frame = 64;
-
+// 🔥 SPRITE 64x64
 tex.onLoadObservable.add(()=>{
+    let frame = 64;
     tex.uScale = frame / tex.getSize().width;
     tex.vScale = frame / tex.getSize().height;
 });
@@ -143,19 +144,17 @@ function shootPlayer(){
 if(!shootPlayer.last) shootPlayer.last = 0;
 if(Date.now() - shootPlayer.last < 120) return;
 
+let pick = scene.pick(scene.pointerX, scene.pointerY);
+if(!pick.hit) return;
+
 shootPlayer.last = Date.now();
 
 let b = createSprite("assets/sprites/laser.png",1);
 b.position = player.position.clone();
-b.position.z = -1;
+b.position.z = 0;
 
-let pick = scene.pick(scene.pointerX, scene.pointerY);
-
-if(pick.hit){
-    b.dir = pick.pickedPoint.subtract(player.position).normalize();
-}else{
-    b.dir = new BABYLON.Vector3(1,0,0);
-}
+// dirección REAL correcta
+b.dir = pick.pickedPoint.subtract(player.position).normalize();
 
 bulletsPlayer.push(b);
 }
@@ -186,12 +185,12 @@ let e = enemies[i];
 let dir = player.position.subtract(e.position).normalize();
 e.position.addInPlace(dir.scale(12*dt));
 
-// disparo
+// disparo enemigo
 if(Date.now()-e.lastFire > 1000){
 
 let b = createSprite("assets/sprites/laser1.png",1);
 b.position = e.position.clone();
-b.position.z = -1;
+b.position.z = 0;
 
 b.dir = player.position.subtract(e.position).normalize();
 
@@ -200,18 +199,18 @@ bulletsEnemy.push(b);
 e.lastFire = Date.now();
 }
 
-// HIT
+// ===== COLISIÓN REAL =====
 for(let j = bulletsPlayer.length-1; j>=0; j--){
 let b = bulletsPlayer[j];
 
-if(dist(e,b)<2){
+if(dist(e,b) < 3){
 
 b.dispose();
 bulletsPlayer.splice(j,1);
 
 e.hp--;
 
-if(e.hp<=0){
+if(e.hp <= 0){
 e.dispose();
 enemies.splice(i,1);
 score++;
@@ -227,7 +226,7 @@ break;
 for(let i = bulletsEnemy.length-1; i>=0; i--){
 let b = bulletsEnemy[i];
 
-if(dist(player,b)<2){
+if(dist(player,b) < 3){
 
 b.dispose();
 bulletsEnemy.splice(i,1);
@@ -245,7 +244,7 @@ let b = bulletsPlayer[i];
 
 b.position.addInPlace(b.dir.scale(60*dt));
 
-if(BABYLON.Vector3.Distance(player.position,b.position)>120){
+if(BABYLON.Vector3.Distance(player.position,b.position)>150){
 b.dispose();
 bulletsPlayer.splice(i,1);
 }
@@ -256,7 +255,7 @@ let b = bulletsEnemy[i];
 
 b.position.addInPlace(b.dir.scale(60*dt));
 
-if(BABYLON.Vector3.Distance(player.position,b.position)>120){
+if(BABYLON.Vector3.Distance(player.position,b.position)>150){
 b.dispose();
 bulletsEnemy.splice(i,1);
 }
