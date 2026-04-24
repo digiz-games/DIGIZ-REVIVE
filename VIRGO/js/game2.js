@@ -1,18 +1,14 @@
 const canvas = document.getElementById("renderCanvas");
 const engine = new BABYLON.Engine(canvas, true);
 
-let scene, player, camera;
+let scene, player, camera, ui;
 
-// ================= DATA =================
 let enemies1 = [], enemies2 = [], enemies3 = [];
-let bulletsPlayer = [];
-let bulletsEnemy = [];
-
+let bulletsPlayer = [], bulletsEnemy = [];
 let ast1 = [], ast2 = [], ast3 = [];
 
 let vida = 200, maxVida = 200;
 let score = 0;
-
 let lastFire = 0;
 
 // ================= SCENE =================
@@ -20,12 +16,11 @@ const createScene = () => {
 
 scene = new BABYLON.Scene(engine);
 
-// 🔥 CÁMARA 2D REAL
+// ===== CÁMARA 2D =====
 camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
-
 camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
 
-let ratio = engine.getRenderWidth() / engine.getRenderHeight();
+let ratio = engine.getRenderWidth()/engine.getRenderHeight();
 let size = 50;
 
 camera.orthoLeft = -size * ratio;
@@ -33,51 +28,50 @@ camera.orthoRight = size * ratio;
 camera.orthoTop = size;
 camera.orthoBottom = -size;
 
-camera.setTarget(BABYLON.Vector3.Zero());
-
-// LUZ
+// ===== LUZ =====
 new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
-// 🔥 FONDO FIJO (NO PISO)
+// ===== FONDO =====
 let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:200},scene);
 let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
+
 bgMat.diffuseTexture = new BABYLON.Texture("assets/space_bg.jpg",scene);
+bgMat.emissiveTexture = bgMat.diffuseTexture;
 bgMat.disableLighting = true;
 
 bg.material = bgMat;
 bg.position.z = 5;
-bg.parent = camera;
+bg.isPickable = false;
+bg.renderingGroupId = 0;
 
-// PLAYER
+// ===== PLAYER =====
 player = createSprite("assets/sprites/nave.png",4);
-player.position = BABYLON.Vector3.Zero();
+player.position = new BABYLON.Vector3(0,0,0);
 
 camera.lockedTarget = player;
 
-// INPUT
+// ===== INPUT =====
 let pointerDown = false;
 
 scene.onPointerDown = ()=> pointerDown = true;
 scene.onPointerUp = ()=> pointerDown = false;
 
-// LOOP
+// ===== UI =====
+createUI();
+
+// ===== LOOP =====
 scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
 
-// 🔥 MOVIMIENTO 2D REAL
+// MOVIMIENTO
 if(pointerDown){
-
-let x = (scene.pointerX / engine.getRenderWidth()) * 100 - 50;
-let y = -(scene.pointerY / engine.getRenderHeight()) * 100 + 50;
-
-let target = new BABYLON.Vector3(x,y,0);
-
+let target = getMouseWorld();
 let dir = target.subtract(player.position).normalize();
 player.position.addInPlace(dir.scale(25*dt));
 }
 
-// DISPARO PLAYER
+// DISPARO
 if(Date.now() - lastFire > 120){
 shootPlayer();
 lastFire = Date.now();
@@ -87,6 +81,7 @@ lastFire = Date.now();
 updateBullets(dt);
 updateEnemies(dt);
 updateAsteroids(dt);
+updateUI();
 
 });
 
@@ -106,30 +101,31 @@ let mat = new BABYLON.StandardMaterial("mat",scene);
 mat.diffuseTexture = new BABYLON.Texture(texture,scene);
 mat.diffuseTexture.hasAlpha = true;
 
-// 🔥 IMPORTANTE
+mat.emissiveColor = new BABYLON.Color3(1,1,1);
 mat.backFaceCulling = false;
+mat.disableDepthWrite = true;
 
 m.material = mat;
-
-// 🔥 SIEMPRE MIRAR A CÁMARA
 m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+m.renderingGroupId = 1;
 
 return m;
 }
 
-// ================= PLAYER =================
-function shootPlayer(){
-
-let b = createSprite("assets/sprites/laser.png",1);
-b.position = player.position.clone();
-
-// 🔥 DISPARO HACIA MOUSE CORRECTO
+// ================= INPUT =================
+function getMouseWorld(){
 let x = (scene.pointerX / engine.getRenderWidth()) * 100 - 50;
 let y = -(scene.pointerY / engine.getRenderHeight()) * 100 + 50;
+return new BABYLON.Vector3(x,y,0);
+}
 
-let target = new BABYLON.Vector3(x,y,0);
+// ================= PLAYER =================
+function shootPlayer(){
+let b = createSprite("assets/sprites/laser.png",1);
+b.position = player.position.clone();
+b.position.z = -1;
 
-b.dir = target.subtract(player.position).normalize();
+b.dir = getMouseWorld().subtract(player.position).normalize();
 
 bulletsPlayer.push(b);
 }
@@ -170,10 +166,10 @@ e.position.addInPlace(dir.scale(speed*dt));
 if(Date.now()-e.lastFire > (e.type==3?2000:1000)){
 
 if(e.type==3){
-// RADIAL
 for(let a=0;a<360;a+=30){
 let b = createSprite("assets/sprites/laser3.png",1);
 b.position = e.position.clone();
+b.position.z = -1;
 
 b.dir = new BABYLON.Vector3(
 Math.cos(a*Math.PI/180),
@@ -184,11 +180,11 @@ Math.sin(a*Math.PI/180),
 bulletsEnemy.push(b);
 }
 }else{
-
 let b = createSprite(`assets/sprites/laser${e.type}.png`,1);
 b.position = e.position.clone();
-b.dir = player.position.subtract(e.position).normalize();
+b.position.z = -1;
 
+b.dir = player.position.subtract(e.position).normalize();
 bulletsEnemy.push(b);
 }
 
@@ -228,12 +224,11 @@ vida = Math.min(maxVida, vida*2);
 // HIT PLAYER
 bulletsEnemy.forEach((b,bi)=>{
 if(dist(player,b)<2){
-vida-=10;
+vida -= 10;
 b.dispose();
 bulletsEnemy.splice(bi,1);
 }
 });
-
 }
 
 // ================= ASTEROIDES =================
@@ -274,7 +269,7 @@ function updateAsteroids(dt){
 ast2.forEach((a,i)=>{
 a.position.addInPlace(a.vel.scale(dt));
 if(dist(player,a)<3){
-vida-=5;
+vida -= 5;
 a.dispose();
 ast2.splice(i,1);
 }
@@ -308,6 +303,39 @@ ast3.splice(i,1);
 });
 });
 
+}
+
+// ================= UI =================
+function createUI(){
+ui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("ui");
+
+let text = new BABYLON.GUI.TextBlock();
+text.name = "score";
+text.color = "white";
+text.fontSize = 24;
+text.top = "-45%";
+text.left = "-45%";
+text.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+
+ui.addControl(text);
+
+let vidaBar = new BABYLON.GUI.Rectangle();
+vidaBar.height = "10px";
+vidaBar.width = "200px";
+vidaBar.background = "red";
+vidaBar.top = "-40%";
+vidaBar.left = "-45%";
+vidaBar.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+
+ui.addControl(vidaBar);
+
+ui.score = text;
+ui.vidaBar = vidaBar;
+}
+
+function updateUI(){
+ui.score.text = "Score: " + score;
+ui.vidaBar.width = (200 * (vida/maxVida)) + "px";
 }
 
 // ================= UTILS =================
