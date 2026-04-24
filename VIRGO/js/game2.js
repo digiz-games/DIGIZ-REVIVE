@@ -47,6 +47,9 @@ bg.position.z = 5;
 bg.isPickable = false;
 
 // ===== PLAYER =====
+console.log("scene:", scene);
+console.log("createSprite:", createSprite);
+    
 player = createSprite("assets/sprites/nave.png",4);
 
 if(!player){
@@ -54,6 +57,9 @@ if(!player){
 }
 
 player.position = new BABYLON.Vector3(0,0,0);
+
+  player = createSprite("assets/sprites/nave.png",4);
+console.log("player creado:", player);  
 
 // ===== INPUT =====
 let pointerDown = false;
