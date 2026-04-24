@@ -4,10 +4,9 @@ const engine = new BABYLON.Engine(canvas, true);
 let scene, player, camera;
 
 let enemies = [];
-let bulletsPlayer = [], bulletsEnemy = [];
+let bulletsPlayer = [];
 
 let shooting = false;
-let score = 0;
 
 // ================= SCENE =================
 const createScene = () => {
@@ -32,15 +31,15 @@ camera.inputs.clear();
 // ===== LUZ =====
 new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
-// ===== FONDO GRANDE REAL =====
-let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:2000},scene);
+// ===== 🔥 FONDO MOSAICO GRANDE REAL =====
+let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:5000},scene);
 
 let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
 let bgTex = new BABYLON.Texture("assets/space_bg.jpg",scene);
 
-// 🔥 TEXTURA GRANDE (no mosaico chico)
-bgTex.uScale = 1;
-bgTex.vScale = 1;
+// 🔥 CLAVE: textura casi sin repetir → mosaicos gigantes
+bgTex.uScale = 0.2;
+bgTex.vScale = 0.2;
 
 bgMat.diffuseTexture = bgTex;
 bgMat.emissiveTexture = bgTex;
@@ -75,17 +74,16 @@ let dt = engine.getDeltaTime()/1000;
 camera.position.x = player.position.x;
 camera.position.y = player.position.y;
 
-// fondo sigue player
+// fondo sigue player (mosaico infinito)
 bg.position.x = player.position.x;
 bg.position.y = player.position.y;
 
-// ===== MOVIMIENTO CONTINUO =====
+// ===== MOVIMIENTO =====
 let pick = scene.pick(scene.pointerX, scene.pointerY);
 
 if(pick.hit){
 
-let target = pick.pickedPoint;
-let dir = target.subtract(player.position);
+let dir = pick.pickedPoint.subtract(player.position);
 
 if(dir.length() > 0.1){
 dir.normalize();
@@ -119,11 +117,11 @@ let tex = new BABYLON.Texture(texture,scene);
 
 tex.hasAlpha = true;
 
-// 🔥 SPRITE 64x64
+// frame 64x64
 tex.onLoadObservable.add(()=>{
-    let frame = 64;
-    tex.uScale = frame / tex.getSize().width;
-    tex.vScale = frame / tex.getSize().height;
+let frame = 64;
+tex.uScale = frame / tex.getSize().width;
+tex.vScale = frame / tex.getSize().height;
 });
 
 mat.diffuseTexture = tex;
@@ -151,9 +149,8 @@ shootPlayer.last = Date.now();
 
 let b = createSprite("assets/sprites/laser.png",1);
 b.position = player.position.clone();
-b.position.z = 0;
 
-// dirección REAL correcta
+// 🔥 dirección REAL
 b.dir = pick.pickedPoint.subtract(player.position).normalize();
 
 bulletsPlayer.push(b);
@@ -171,7 +168,6 @@ let e = createSprite("assets/sprites/enemy.png",4);
 e.position = new BABYLON.Vector3(x,y,0);
 
 e.hp = 1;
-e.lastFire = 0;
 
 enemies.push(e);
 }
@@ -182,56 +178,31 @@ for(let i = enemies.length-1; i>=0; i--){
 
 let e = enemies[i];
 
+// movimiento
 let dir = player.position.subtract(e.position).normalize();
-e.position.addInPlace(dir.scale(12*dt));
+e.position.addInPlace(dir.scale(10*dt));
 
-// disparo enemigo
-if(Date.now()-e.lastFire > 1000){
-
-let b = createSprite("assets/sprites/laser1.png",1);
-b.position = e.position.clone();
-b.position.z = 0;
-
-b.dir = player.position.subtract(e.position).normalize();
-
-bulletsEnemy.push(b);
-
-e.lastFire = Date.now();
-}
-
-// ===== COLISIÓN REAL =====
+// 🔥 COLISIÓN REAL (radio correcto)
 for(let j = bulletsPlayer.length-1; j>=0; j--){
+
 let b = bulletsPlayer[j];
 
-if(dist(e,b) < 3){
+// radio basado en tamaño real
+let hitDist = 2.5;
+
+if(BABYLON.Vector3.Distance(e.position, b.position) < hitDist){
 
 b.dispose();
 bulletsPlayer.splice(j,1);
 
-e.hp--;
-
-if(e.hp <= 0){
 e.dispose();
 enemies.splice(i,1);
-score++;
+
 break;
 }
 
 }
-}
 
-}
-
-// HIT PLAYER
-for(let i = bulletsEnemy.length-1; i>=0; i--){
-let b = bulletsEnemy[i];
-
-if(dist(player,b) < 3){
-
-b.dispose();
-bulletsEnemy.splice(i,1);
-
-}
 }
 
 }
@@ -240,6 +211,7 @@ bulletsEnemy.splice(i,1);
 function updateBullets(dt){
 
 for(let i = bulletsPlayer.length-1; i>=0; i--){
+
 let b = bulletsPlayer[i];
 
 b.position.addInPlace(b.dir.scale(60*dt));
@@ -248,38 +220,20 @@ if(BABYLON.Vector3.Distance(player.position,b.position)>150){
 b.dispose();
 bulletsPlayer.splice(i,1);
 }
-}
 
-for(let i = bulletsEnemy.length-1; i>=0; i--){
-let b = bulletsEnemy[i];
-
-b.position.addInPlace(b.dir.scale(60*dt));
-
-if(BABYLON.Vector3.Distance(player.position,b.position)>150){
-b.dispose();
-bulletsEnemy.splice(i,1);
-}
 }
 
 }
 
 // ================= UTILS =================
-function dist(a,b){
-return BABYLON.Vector3.Distance(a.position,b.position);
-}
-
 function spawnOutside(){
 
-let side = Math.floor(Math.random()*4);
 let d = 80;
 
-let px = player.position.x;
-let py = player.position.y;
-
-if(side==0) return {x:px+80,y:py+(Math.random()*d-d/2)};
-if(side==1) return {x:px-80,y:py+(Math.random()*d-d/2)};
-if(side==2) return {x:px+(Math.random()*d-d/2),y:py+80};
-return {x:px+(Math.random()*d-d/2),y:py-80};
+return {
+x: player.position.x + (Math.random()*d - d/2),
+y: player.position.y + 80
+};
 
 }
 
