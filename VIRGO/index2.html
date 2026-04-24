@@ -1,30 +1,35 @@
 <html>
-    <head>
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content:;">
-        <meta name="format-detection" content="telephone=no">
-        <meta name="msapplication-tap-highlight" content="no">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, minimal-ui" />
-        <link rel="stylesheet" type="text/css" href="css/index.css">
-        <title>Virgo</title>
-        <style>
-			body{
-				margin:0px;
-				padding:0px;
-			}
+<head>
 
-		</style>
-	</head>
-    </head>
-    <body>
-            <div id='game'></div>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+<title>Virgo</title>
 
-      
-          <script type="text/javascript" src="js/game2.js"></script>
-    
+<style>
+html, body {
+    width:100%;
+    height:100%;
+    margin:0;
+    overflow:hidden;
+}
 
-      
+#renderCanvas {
+    width:100%;
+    height:100%;
+}
+</style>
 
+</head>
 
-    </body>
+<body>
+
+<canvas id="renderCanvas"></canvas>
+
+<!-- 🔥 ESTO FALTABA -->
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+
+<!-- TU JUEGO -->
+<script src="js/game2.js"></script>
+
+</body>
 </html>
