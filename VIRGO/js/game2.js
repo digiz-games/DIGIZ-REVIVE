@@ -51,7 +51,41 @@ bg.isPickable = false;
 bg.renderingGroupId = 0;
 
 // ===== PLAYER =====
-player = createSprite("assets/sprites/nave.png",4);
+function createSprite(texture,size,frameX=0,frameY=0){
+
+let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
+
+let mat = new BABYLON.StandardMaterial("mat",scene);
+let tex = new BABYLON.Texture(texture,scene);
+
+tex.hasAlpha = true;
+
+let frameW = 64;
+let frameH = 64;
+
+let texW = tex.getSize().width;
+let texH = tex.getSize().height;
+
+// 🔥 ESCALA
+tex.uScale = frameW / texW;
+tex.vScale = frameH / texH;
+
+// 🔥 OFFSET (CLAVE)
+tex.uOffset = frameX * tex.uScale;
+tex.vOffset = frameY * tex.vScale;
+
+mat.diffuseTexture = tex;
+
+mat.emissiveColor = new BABYLON.Color3(1,1,1);
+mat.backFaceCulling = false;
+mat.disableDepthWrite = true;
+
+m.material = mat;
+m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+m.renderingGroupId = 1;
+
+return m;
+}
 player.position = new BABYLON.Vector3(0,0,0);
 
 // ===== INPUT =====
