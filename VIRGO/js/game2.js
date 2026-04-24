@@ -5,7 +5,6 @@ let scene, player, camera, ui;
 
 let enemies1 = [], enemies2 = [], enemies3 = [];
 let bulletsPlayer = [], bulletsEnemy = [];
-let ast1 = [], ast2 = [], ast3 = [];
 
 let vida = 200, maxVida = 200;
 let score = 0;
@@ -72,7 +71,7 @@ let dir = target.subtract(player.position).normalize();
 player.position.addInPlace(dir.scale(25*dt));
 }
 
-// ROTACIÓN (🔥 importante)
+// ROTACIÓN
 let dirRot = getMouseWorld().subtract(player.position);
 player.rotation.z = Math.atan2(dirRot.y, dirRot.x);
 
@@ -85,13 +84,11 @@ lastFire = Date.now();
 // UPDATE
 updateBullets(dt);
 updateEnemies(dt);
-updateAsteroids(dt);
 updateUI();
 
 });
 
 setInterval(spawnEnemy,1500);
-setInterval(spawnAsteroids,700);
 
 return scene;
 };
@@ -102,14 +99,26 @@ function createSprite(texture,size){
 let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
 
 let mat = new BABYLON.StandardMaterial("mat",scene);
-let tex = new BABYLON.Texture(texture,scene);
+
+let tex = new BABYLON.Texture(
+    texture,
+    scene,
+    false,
+    false,
+    BABYLON.Texture.NEAREST_SAMPLINGMODE,
+    () => {
+        // 🔥 aplicar cuando carga
+        let frameSize = 64;
+
+        let texW = tex.getSize().width;
+        let texH = tex.getSize().height;
+
+        tex.uScale = frameSize / texW;
+        tex.vScale = frameSize / texH;
+    }
+);
 
 tex.hasAlpha = true;
-
-// 🔥 CORTE REAL 64x64
-let frameSize = 64;
-tex.uScale = frameSize / tex.getSize().width;
-tex.vScale = frameSize / tex.getSize().height;
 
 mat.diffuseTexture = tex;
 mat.emissiveColor = new BABYLON.Color3(1,1,1);
@@ -154,7 +163,7 @@ function createEnemy(type,x,y){
 
 let tex = type==1?"enemy":type==2?"enemy2":"enemy3";
 
-let e = createSprite(`assets/sprites/${tex}.png`, type==3?8:4);
+let e = createSprite(`assets/sprites/${tex}.png`, 4);
 e.position = new BABYLON.Vector3(x,y,0);
 
 e.hp = type==1?1:type==2?3:5;
@@ -177,11 +186,12 @@ let speed = e.type==1?12:e.type==2?20:6;
 e.position.addInPlace(dir.scale(speed*dt));
 
 // DISPARO
-if(Date.now()-e.lastFire > (e.type==3?2000:1000)){
+if(Date.now()-e.lastFire > 1000){
 
 let b = createSprite(`assets/sprites/laser${e.type}.png`,1);
 b.position = e.position.clone();
 b.position.z = -1;
+
 b.dir = player.position.subtract(e.position).normalize();
 
 bulletsEnemy.push(b);
@@ -216,16 +226,6 @@ bulletsEnemy.splice(bi,1);
 }
 });
 }
-
-// ================= ASTEROIDES =================
-function spawnAsteroids(){
-let p = spawnOutside();
-let a = createSprite("assets/sprites/asteroide.png",3);
-a.position = new BABYLON.Vector3(p.x,p.y,0);
-ast1.push(a);
-}
-
-function updateAsteroids(dt){}
 
 // ================= UI =================
 function createUI(){
@@ -277,5 +277,6 @@ return {x:Math.random()*d-d/2,y:-80};
 
 // ================= INIT =================
 scene = createScene();
+
 engine.runRenderLoop(()=> scene.render());
 window.addEventListener("resize",()=>engine.resize());
