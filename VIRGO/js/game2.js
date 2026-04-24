@@ -6,11 +6,10 @@ let scene, player, camera, ui;
 let enemies = [];
 let bulletsPlayer = [], bulletsEnemy = [];
 
-let vida = 200, maxVida = 200;
-let score = 0;
+let vida = 200, score = 0;
 
+let isShooting = false;
 let lastFire = 0;
-let moving = false;
 
 // ================= SCENE =================
 const createScene = () => {
@@ -22,8 +21,8 @@ scene.clearColor = new BABYLON.Color4(0,0,0,1);
 camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
 camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
 
-let ratio = engine.getRenderWidth()/engine.getRenderHeight();
 let size = 50;
+let ratio = engine.getRenderWidth()/engine.getRenderHeight();
 
 camera.orthoLeft = -size * ratio;
 camera.orthoRight = size * ratio;
@@ -37,8 +36,8 @@ new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
 // ===== FONDO =====
 let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:200},scene);
-
 let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
+
 bgMat.diffuseTexture = new BABYLON.Texture("assets/space_bg.jpg",scene);
 bgMat.emissiveTexture = bgMat.diffuseTexture;
 bgMat.disableLighting = true;
@@ -46,22 +45,25 @@ bgMat.disableLighting = true;
 bg.material = bgMat;
 bg.position.z = 5;
 
-// ===== PLAYER =====
+// ===== PLAYER (SOLO UNO) =====
 player = createSprite("assets/sprites/nave.png",4);
 player.position = new BABYLON.Vector3(0,0,0);
 
-// ===== INPUT =====
+// ===== INPUT (SOLO DISPARO) =====
 scene.onPointerObservable.add((pointerInfo)=>{
 
 switch(pointerInfo.type){
 
 case BABYLON.PointerEventTypes.POINTERDOWN:
-    moving = true;
-    shootPlayer(); // dispara solo al hacer click
+    if(pointerInfo.event.button === 0){
+        isShooting = true;
+    }
 break;
 
 case BABYLON.PointerEventTypes.POINTERUP:
-    moving = false;
+    if(pointerInfo.event.button === 0){
+        isShooting = false;
+    }
 break;
 
 }
@@ -76,26 +78,34 @@ scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
 
-// cámara sigue al player
+// cámara sigue player
 camera.position.x = player.position.x;
 camera.position.y = player.position.y;
 
-// MOVIMIENTO
-if(moving){
+// fondo sigue cámara
+bg.position.x = camera.position.x;
+bg.position.y = camera.position.y;
+
+// ===== MOVIMIENTO (SIEMPRE ACTIVO) =====
 let target = getMouseWorld();
-let dir = target.subtract(player.position).normalize();
+let dir = target.subtract(player.position);
+
+if(dir.length() > 0.1){
+dir.normalize();
 player.position.addInPlace(dir.scale(25*dt));
 }
 
-// ROTACIÓN
-let mouse = getMouseWorld();
-let dirRot = mouse.subtract(player.position);
-
-if(dirRot.length() > 0.1){
-player.rotation.z = Math.atan2(dirRot.y, dirRot.x);
+// ===== ROTACIÓN =====
+if(dir.length() > 0.1){
+player.rotation.z = Math.atan2(dir.y, dir.x);
 }
 
-// UPDATE
+// ===== DISPARO =====
+if(isShooting){
+shootPlayer();
+}
+
+// ===== UPDATE =====
 updateBullets(dt);
 updateEnemies(dt);
 updateUI();
@@ -110,29 +120,18 @@ return scene;
 // ================= SPRITE =================
 function createSprite(texture,size){
 
-let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
+let m = BABYLON.MeshBuilder.CreatePlane("sprite",{size},scene);
 
 let mat = new BABYLON.StandardMaterial("mat",scene);
 
-let tex = new BABYLON.Texture(
-texture,
-scene,
-false,
-false,
-BABYLON.Texture.NEAREST_SAMPLINGMODE,
-()=>{
-
-let frameSize = 64;
-let texW = tex.getSize().width;
-let texH = tex.getSize().height;
-
-tex.uScale = frameSize / texW;
-tex.vScale = frameSize / texH;
-
-}
-);
+let tex = new BABYLON.Texture(texture,scene);
 
 tex.hasAlpha = true;
+
+// cortar spritesheet (64x64)
+let frameSize = 64;
+tex.uScale = frameSize / tex.getSize().width;
+tex.vScale = frameSize / tex.getSize().height;
 
 mat.diffuseTexture = tex;
 mat.emissiveColor = new BABYLON.Color3(1,1,1);
