@@ -68,9 +68,10 @@ scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
 
-// 🔥 CÁMARA SIGUE PLAYER (SIN ROTAR)
-camera.position.x = player.position.x;
-camera.position.y = player.position.y;
+
+// 🔥 cámara FIJA
+camera.position.x = 0;
+camera.position.y = 0;
 
 // MOVIMIENTO
 if(pointerDown){
