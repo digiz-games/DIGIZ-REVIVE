@@ -18,7 +18,7 @@ scene.clearColor = new BABYLON.Color4(0,0,0,1);
 camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
 camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
 
-let size = 50;
+let size = 30;
 let ratio = engine.getRenderWidth()/engine.getRenderHeight();
 
 camera.orthoLeft = -size * ratio;
@@ -37,9 +37,12 @@ let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:5000},scene);
 let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
 let bgTex = new BABYLON.Texture("assets/space_bg.jpg",scene);
 
-// 🔥 CLAVE: textura casi sin repetir → mosaicos gigantes
-bgTex.uScale = 0.1;
-bgTex.vScale = 0.02;
+// 🔥 mismo valor en ambos ejes
+bgTex.uScale = 0.01;
+bgTex.vScale = 0.01;
+
+// 🔥 evita blur feo al escalar
+bgTex.updateSamplingMode(BABYLON.Texture.NEAREST_SAMPLINGMODE);
 
 bgMat.diffuseTexture = bgTex;
 bgMat.emissiveTexture = bgTex;
