@@ -6,10 +6,10 @@ let scene, player, camera, ui;
 let enemies = [];
 let bulletsPlayer = [], bulletsEnemy = [];
 
-let vida = 200, score = 0;
+let vida = 200, maxVida = 200;
+let score = 0;
 
-let isShooting = false;
-let lastFire = 0;
+let shooting = false;
 
 // ================= SCENE =================
 const createScene = () => {
@@ -21,8 +21,8 @@ scene.clearColor = new BABYLON.Color4(0,0,0,1);
 camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
 camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
 
-let size = 50;
 let ratio = engine.getRenderWidth()/engine.getRenderHeight();
+let size = 50;
 
 camera.orthoLeft = -size * ratio;
 camera.orthoRight = size * ratio;
@@ -34,35 +34,40 @@ camera.inputs.clear();
 // ===== LUZ =====
 new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
-// ===== FONDO =====
-let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:200},scene);
-let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
+// ===== FONDO INFINITO =====
+let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:500},scene);
 
-bgMat.diffuseTexture = new BABYLON.Texture("assets/space_bg.jpg",scene);
-bgMat.emissiveTexture = bgMat.diffuseTexture;
+let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
+let bgTex = new BABYLON.Texture("assets/space_bg.jpg",scene);
+
+bgTex.uScale = 20;
+bgTex.vScale = 20;
+
+bgMat.diffuseTexture = bgTex;
+bgMat.emissiveTexture = bgTex;
 bgMat.disableLighting = true;
 
 bg.material = bgMat;
-bg.position.z = 5;
+bg.position.z = 10;
 
-// ===== PLAYER (SOLO UNO) =====
+// ===== PLAYER =====
 player = createSprite("assets/sprites/nave.png",4);
 player.position = new BABYLON.Vector3(0,0,0);
 
-// ===== INPUT (SOLO DISPARO) =====
+// ===== INPUT SOLO DISPARO =====
 scene.onPointerObservable.add((pointerInfo)=>{
 
 switch(pointerInfo.type){
 
 case BABYLON.PointerEventTypes.POINTERDOWN:
     if(pointerInfo.event.button === 0){
-        isShooting = true;
+        shooting = true;
     }
 break;
 
 case BABYLON.PointerEventTypes.POINTERUP:
     if(pointerInfo.event.button === 0){
-        isShooting = false;
+        shooting = false;
     }
 break;
 
@@ -78,34 +83,34 @@ scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
 
-// cámara sigue player
+// 📌 cámara sigue al player
 camera.position.x = player.position.x;
 camera.position.y = player.position.y;
 
-// fondo sigue cámara
-bg.position.x = camera.position.x;
-bg.position.y = camera.position.y;
+// 📌 fondo sigue cámara (efecto infinito)
+bg.position.x = player.position.x;
+bg.position.y = player.position.y;
 
-// ===== MOVIMIENTO (SIEMPRE ACTIVO) =====
+// ================= MOVIMIENTO (SIN CLICK) =================
 let target = getMouseWorld();
 let dir = target.subtract(player.position);
 
 if(dir.length() > 0.1){
-dir.normalize();
-player.position.addInPlace(dir.scale(25*dt));
+    dir = dir.normalize();
+    player.position.addInPlace(dir.scale(25*dt));
 }
 
-// ===== ROTACIÓN =====
+// ROTACIÓN
 if(dir.length() > 0.1){
-player.rotation.z = Math.atan2(dir.y, dir.x);
+    player.rotation.z = Math.atan2(dir.y, dir.x);
 }
 
-// ===== DISPARO =====
-if(isShooting){
-shootPlayer();
+// ================= DISPARO =================
+if(shooting){
+    shootPlayer();
 }
 
-// ===== UPDATE =====
+// UPDATE
 updateBullets(dt);
 updateEnemies(dt);
 updateUI();
@@ -120,18 +125,29 @@ return scene;
 // ================= SPRITE =================
 function createSprite(texture,size){
 
-let m = BABYLON.MeshBuilder.CreatePlane("sprite",{size},scene);
+let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
 
 let mat = new BABYLON.StandardMaterial("mat",scene);
 
-let tex = new BABYLON.Texture(texture,scene);
+let tex = new BABYLON.Texture(
+texture,
+scene,
+false,
+false,
+BABYLON.Texture.NEAREST_SAMPLINGMODE,
+()=>{
+
+let frameSize = 64;
+let texW = tex.getSize().width;
+let texH = tex.getSize().height;
+
+tex.uScale = frameSize / texW;
+tex.vScale = frameSize / texH;
+
+}
+);
 
 tex.hasAlpha = true;
-
-// cortar spritesheet (64x64)
-let frameSize = 64;
-tex.uScale = frameSize / tex.getSize().width;
-tex.vScale = frameSize / tex.getSize().height;
 
 mat.diffuseTexture = tex;
 mat.emissiveColor = new BABYLON.Color3(1,1,1);
@@ -145,23 +161,22 @@ m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 return m;
 }
 
-// ================= MOUSE REAL =================
+// ================= INPUT =================
 function getMouseWorld(){
-
-let pick = scene.pick(scene.pointerX, scene.pointerY);
-
-if(pick.hit){
-return pick.pickedPoint;
-}
-
-return player.position.clone();
+let x = (scene.pointerX / engine.getRenderWidth()) * 100 - 50;
+let y = -(scene.pointerY / engine.getRenderHeight()) * 100 + 50;
+return new BABYLON.Vector3(x,y,0);
 }
 
 // ================= PLAYER =================
 function shootPlayer(){
 
-if(Date.now() - lastFire < 120) return;
-lastFire = Date.now();
+// 🔥 rate simple
+if(!shootPlayer.lastTime) shootPlayer.lastTime = 0;
+
+if(Date.now() - shootPlayer.lastTime < 120) return;
+
+shootPlayer.lastTime = Date.now();
 
 let b = createSprite("assets/sprites/laser.png",1);
 b.position = player.position.clone();
@@ -256,6 +271,7 @@ text.left = "-45%";
 
 ui.addControl(text);
 ui.score = text;
+
 }
 
 function updateUI(){
