@@ -15,9 +15,11 @@ let lastFire = 0;
 const createScene = () => {
 
 scene = new BABYLON.Scene(engine);
+scene.clearColor = new BABYLON.Color4(0,0,0,1);
 
 // ===== CÁMARA 2D =====
 camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
+
 camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
 
 let ratio = engine.getRenderWidth()/engine.getRenderHeight();
@@ -28,27 +30,29 @@ camera.orthoRight = size * ratio;
 camera.orthoTop = size;
 camera.orthoBottom = -size;
 
+// 🔥 BLOQUEAR ROTACIÓN
+camera.rotation = new BABYLON.Vector3(0,0,0);
+camera.inputs.clear();
+
 // ===== LUZ =====
 new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
 // ===== FONDO =====
 let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:200},scene);
-let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
 
+let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
 bgMat.diffuseTexture = new BABYLON.Texture("assets/space_bg.jpg",scene);
 bgMat.emissiveTexture = bgMat.diffuseTexture;
 bgMat.disableLighting = true;
 
 bg.material = bgMat;
-bg.position.z = 5;
+bg.position.z = 1;
 bg.isPickable = false;
 bg.renderingGroupId = 0;
 
 // ===== PLAYER =====
 player = createSprite("assets/sprites/nave.png",4);
 player.position = new BABYLON.Vector3(0,0,0);
-
-camera.lockedTarget = player;
 
 // ===== INPUT =====
 let pointerDown = false;
@@ -63,6 +67,10 @@ createUI();
 scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
+
+// 🔥 CÁMARA SIGUE PLAYER (SIN ROTAR)
+camera.position.x = player.position.x;
+camera.position.y = player.position.y;
 
 // MOVIMIENTO
 if(pointerDown){
@@ -85,7 +93,6 @@ updateUI();
 
 });
 
-// SPAWN
 setInterval(spawnEnemy,1500);
 setInterval(spawnAsteroids,700);
 
@@ -98,16 +105,26 @@ function createSprite(texture,size){
 let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
 
 let mat = new BABYLON.StandardMaterial("mat",scene);
-mat.diffuseTexture = new BABYLON.Texture(texture,scene);
-mat.diffuseTexture.hasAlpha = true;
+let tex = new BABYLON.Texture(texture,scene);
 
+tex.hasAlpha = true;
+
+// 🔥 MOSTRAR SOLO 1 FRAME (64x64)
+let frameSize = 64;
+tex.uScale = frameSize / tex.getSize().width;
+tex.vScale = frameSize / tex.getSize().height;
+
+mat.diffuseTexture = tex;
 mat.emissiveColor = new BABYLON.Color3(1,1,1);
+
 mat.backFaceCulling = false;
 mat.disableDepthWrite = true;
 
 m.material = mat;
 m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 m.renderingGroupId = 1;
+
+m.position.z = 0;
 
 return m;
 }
@@ -121,9 +138,10 @@ return new BABYLON.Vector3(x,y,0);
 
 // ================= PLAYER =================
 function shootPlayer(){
+
 let b = createSprite("assets/sprites/laser.png",1);
 b.position = player.position.clone();
-b.position.z = -1;
+b.position.z = -0.1;
 
 b.dir = getMouseWorld().subtract(player.position).normalize();
 
@@ -169,7 +187,7 @@ if(e.type==3){
 for(let a=0;a<360;a+=30){
 let b = createSprite("assets/sprites/laser3.png",1);
 b.position = e.position.clone();
-b.position.z = -1;
+b.position.z = -0.1;
 
 b.dir = new BABYLON.Vector3(
 Math.cos(a*Math.PI/180),
@@ -182,9 +200,10 @@ bulletsEnemy.push(b);
 }else{
 let b = createSprite(`assets/sprites/laser${e.type}.png`,1);
 b.position = e.position.clone();
-b.position.z = -1;
+b.position.z = -0.1;
 
 b.dir = player.position.subtract(e.position).normalize();
+
 bulletsEnemy.push(b);
 }
 
@@ -310,7 +329,6 @@ function createUI(){
 ui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("ui");
 
 let text = new BABYLON.GUI.TextBlock();
-text.name = "score";
 text.color = "white";
 text.fontSize = 24;
 text.top = "-45%";
