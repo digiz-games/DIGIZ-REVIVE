@@ -38,7 +38,7 @@ let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
 let bgTex = new BABYLON.Texture("assets/space_bg.jpg",scene);
 
 // 🔥 CLAVE: textura casi sin repetir → mosaicos gigantes
-bgTex.uScale = 0.02;
+bgTex.uScale = 0.1;
 bgTex.vScale = 0.02;
 
 bgMat.diffuseTexture = bgTex;
