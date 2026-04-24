@@ -3,15 +3,14 @@ const engine = new BABYLON.Engine(canvas, true);
 
 let scene, player, camera, ui;
 
-let enemies1 = [];
+let enemies = [];
 let bulletsPlayer = [], bulletsEnemy = [];
 
 let vida = 200, maxVida = 200;
 let score = 0;
 
-// INPUT
-let pointerDown = false;
-let shooting = false;
+let lastFire = 0;
+let moving = false;
 
 // ================= SCENE =================
 const createScene = () => {
@@ -38,8 +37,8 @@ new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
 // ===== FONDO =====
 let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:200},scene);
-let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
 
+let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
 bgMat.diffuseTexture = new BABYLON.Texture("assets/space_bg.jpg",scene);
 bgMat.emissiveTexture = bgMat.diffuseTexture;
 bgMat.disableLighting = true;
@@ -57,17 +56,12 @@ scene.onPointerObservable.add((pointerInfo)=>{
 switch(pointerInfo.type){
 
 case BABYLON.PointerEventTypes.POINTERDOWN:
-    pointerDown = true;
-
-    if(pointerInfo.event.button === 0){
-        shooting = true;
-        shootPlayer();
-    }
+    moving = true;
+    shootPlayer(); // dispara solo al hacer click
 break;
 
 case BABYLON.PointerEventTypes.POINTERUP:
-    pointerDown = false;
-    shooting = false;
+    moving = false;
 break;
 
 }
@@ -82,12 +76,12 @@ scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
 
-// 📌 cámara sigue al player
+// cámara sigue al player
 camera.position.x = player.position.x;
 camera.position.y = player.position.y;
 
 // MOVIMIENTO
-if(pointerDown && !shooting){
+if(moving){
 let target = getMouseWorld();
 let dir = target.subtract(player.position).normalize();
 player.position.addInPlace(dir.scale(25*dt));
@@ -152,15 +146,23 @@ m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 return m;
 }
 
-// ================= INPUT =================
+// ================= MOUSE REAL =================
 function getMouseWorld(){
-let x = (scene.pointerX / engine.getRenderWidth()) * 100 - 50;
-let y = -(scene.pointerY / engine.getRenderHeight()) * 100 + 50;
-return new BABYLON.Vector3(x,y,0);
+
+let pick = scene.pick(scene.pointerX, scene.pointerY);
+
+if(pick.hit){
+return pick.pickedPoint;
+}
+
+return player.position.clone();
 }
 
 // ================= PLAYER =================
 function shootPlayer(){
+
+if(Date.now() - lastFire < 120) return;
+lastFire = Date.now();
 
 let b = createSprite("assets/sprites/laser.png",1);
 b.position = player.position.clone();
@@ -185,12 +187,12 @@ e.position = new BABYLON.Vector3(x,y,0);
 e.hp = 1;
 e.lastFire = 0;
 
-enemies1.push(e);
+enemies.push(e);
 }
 
 function updateEnemies(dt){
 
-enemies1.forEach((e,i)=>{
+enemies.forEach((e,i)=>{
 
 let dir = player.position.subtract(e.position).normalize();
 e.position.addInPlace(dir.scale(12*dt));
@@ -220,7 +222,7 @@ e.hp--;
 
 if(e.hp<=0){
 e.dispose();
-enemies1.splice(i,1);
+enemies.splice(i,1);
 score++;
 }
 
@@ -255,7 +257,6 @@ text.left = "-45%";
 
 ui.addControl(text);
 ui.score = text;
-
 }
 
 function updateUI(){
