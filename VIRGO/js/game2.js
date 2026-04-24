@@ -20,15 +20,33 @@ const createScene = () => {
 
 scene = new BABYLON.Scene(engine);
 
-camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-60), scene);
+// 🔥 CÁMARA 2D REAL
+camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
+
+camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
+
+let ratio = engine.getRenderWidth() / engine.getRenderHeight();
+let size = 50;
+
+camera.orthoLeft = -size * ratio;
+camera.orthoRight = size * ratio;
+camera.orthoTop = size;
+camera.orthoBottom = -size;
+
 camera.setTarget(BABYLON.Vector3.Zero());
 
+// LUZ
 new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
-// BACK
-let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:2000},scene);
-bg.material = new BABYLON.StandardMaterial("m",scene);
-bg.material.diffuseTexture = new BABYLON.Texture("assets/space_bg.jpg");
+// 🔥 FONDO FIJO (NO PISO)
+let bg = BABYLON.MeshBuilder.CreatePlane("bg",{size:200},scene);
+let bgMat = new BABYLON.StandardMaterial("bgMat",scene);
+bgMat.diffuseTexture = new BABYLON.Texture("assets/space_bg.jpg",scene);
+bgMat.disableLighting = true;
+
+bg.material = bgMat;
+bg.position.z = 5;
+bg.parent = camera;
 
 // PLAYER
 player = createSprite("assets/sprites/nave.png",4);
@@ -47,13 +65,16 @@ scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
 
-// MOVIMIENTO
+// 🔥 MOVIMIENTO 2D REAL
 if(pointerDown){
-let pick = scene.pick(scene.pointerX, scene.pointerY);
-if(pick.hit){
-let dir = pick.pickedPoint.subtract(player.position).normalize();
+
+let x = (scene.pointerX / engine.getRenderWidth()) * 100 - 50;
+let y = -(scene.pointerY / engine.getRenderHeight()) * 100 + 50;
+
+let target = new BABYLON.Vector3(x,y,0);
+
+let dir = target.subtract(player.position).normalize();
 player.position.addInPlace(dir.scale(25*dt));
-}
 }
 
 // DISPARO PLAYER
@@ -78,11 +99,21 @@ return scene;
 
 // ================= SPRITE =================
 function createSprite(texture,size){
+
 let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
+
 let mat = new BABYLON.StandardMaterial("mat",scene);
 mat.diffuseTexture = new BABYLON.Texture(texture,scene);
 mat.diffuseTexture.hasAlpha = true;
+
+// 🔥 IMPORTANTE
+mat.backFaceCulling = false;
+
 m.material = mat;
+
+// 🔥 SIEMPRE MIRAR A CÁMARA
+m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+
 return m;
 }
 
@@ -92,9 +123,13 @@ function shootPlayer(){
 let b = createSprite("assets/sprites/laser.png",1);
 b.position = player.position.clone();
 
-let pick = scene.pick(scene.pointerX, scene.pointerY);
-b.dir = pick.hit ? pick.pickedPoint.subtract(player.position).normalize()
-                 : new BABYLON.Vector3(0,1,0);
+// 🔥 DISPARO HACIA MOUSE CORRECTO
+let x = (scene.pointerX / engine.getRenderWidth()) * 100 - 50;
+let y = -(scene.pointerY / engine.getRenderHeight()) * 100 + 50;
+
+let target = new BABYLON.Vector3(x,y,0);
+
+b.dir = target.subtract(player.position).normalize();
 
 bulletsPlayer.push(b);
 }
@@ -102,7 +137,6 @@ bulletsPlayer.push(b);
 // ================= ENEMIES =================
 function spawnEnemy(){
 let p = spawnOutside();
-
 createEnemy(1,p.x,p.y);
 }
 
@@ -173,7 +207,6 @@ e.dispose();
 list.splice(i,1);
 score++;
 
-// PROGRESIÓN
 if(e.type==1 && score%3==0){
 let p = spawnOutside();
 createEnemy(2,p.x,p.y);
@@ -238,32 +271,39 @@ ast3.push(a);
 
 function updateAsteroids(dt){
 
-ast2.forEach(a=>{
+ast2.forEach((a,i)=>{
 a.position.addInPlace(a.vel.scale(dt));
 if(dist(player,a)<3){
 vida-=5;
 a.dispose();
+ast2.splice(i,1);
 }
 });
 
-ast1.forEach(a=>{
+ast1.forEach((a,i)=>{
 bulletsPlayer.forEach((b,bi)=>{
 if(dist(a,b)<2){
 a.hp--;
 b.dispose();
 bulletsPlayer.splice(bi,1);
-if(a.hp<=0) a.dispose();
+if(a.hp<=0){
+a.dispose();
+ast1.splice(i,1);
+}
 }
 });
 });
 
-ast3.forEach(a=>{
+ast3.forEach((a,i)=>{
 bulletsPlayer.forEach((b,bi)=>{
 if(dist(a,b)<2){
 a.hp--;
 b.dispose();
 bulletsPlayer.splice(bi,1);
-if(a.hp<=0) a.dispose();
+if(a.hp<=0){
+a.dispose();
+ast3.splice(i,1);
+}
 }
 });
 });
@@ -281,7 +321,7 @@ function updateBullets(dt){
 list.forEach((b,i)=>{
 b.position.addInPlace(b.dir.scale(60*dt));
 
-if(BABYLON.Vector3.Distance(player.position,b.position)>600){
+if(BABYLON.Vector3.Distance(player.position,b.position)>120){
 b.dispose();
 list.splice(i,1);
 }
@@ -292,16 +332,16 @@ list.splice(i,1);
 function spawnOutside(){
 
 let side = Math.floor(Math.random()*4);
-let d = 100;
+let d = 80;
 
-if(side==0) return {x:player.position.x+100,y:player.position.y+(Math.random()*d-d/2)};
-if(side==1) return {x:player.position.x-100,y:player.position.y+(Math.random()*d-d/2)};
-if(side==2) return {x:player.position.x+(Math.random()*d-d/2),y:player.position.y+100};
-return {x:player.position.x+(Math.random()*d-d/2),y:player.position.y-100};
+if(side==0) return {x:player.position.x+80,y:player.position.y+(Math.random()*d-d/2)};
+if(side==1) return {x:player.position.x-80,y:player.position.y+(Math.random()*d-d/2)};
+if(side==2) return {x:player.position.x+(Math.random()*d-d/2),y:player.position.y+80};
+return {x:player.position.x+(Math.random()*d-d/2),y:player.position.y-80};
 }
 
 // ================= INIT =================
-createScene();
+scene = createScene();
 
 engine.runRenderLoop(()=> scene.render());
 window.addEventListener("resize",()=>engine.resize());
