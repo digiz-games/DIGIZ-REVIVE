@@ -19,7 +19,6 @@ scene.clearColor = new BABYLON.Color4(0,0,0,1);
 
 // ===== CÁMARA 2D =====
 camera = new BABYLON.FreeCamera("cam", new BABYLON.Vector3(0,0,-10), scene);
-
 camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
 
 let ratio = engine.getRenderWidth()/engine.getRenderHeight();
@@ -30,7 +29,6 @@ camera.orthoRight = size * ratio;
 camera.orthoTop = size;
 camera.orthoBottom = -size;
 
-// 🔥 BLOQUEAR ROTACIÓN
 camera.rotation = new BABYLON.Vector3(0,0,0);
 camera.inputs.clear();
 
@@ -46,46 +44,11 @@ bgMat.emissiveTexture = bgMat.diffuseTexture;
 bgMat.disableLighting = true;
 
 bg.material = bgMat;
-bg.position.z = 1;
+bg.position.z = 5;
 bg.isPickable = false;
-bg.renderingGroupId = 0;
 
 // ===== PLAYER =====
-function createSprite(texture,size,frameX=0,frameY=0){
-
-let m = BABYLON.MeshBuilder.CreatePlane("s",{size},scene);
-
-let mat = new BABYLON.StandardMaterial("mat",scene);
-let tex = new BABYLON.Texture(texture,scene);
-
-tex.hasAlpha = true;
-
-let frameW = 64;
-let frameH = 64;
-
-let texW = tex.getSize().width;
-let texH = tex.getSize().height;
-
-// 🔥 ESCALA
-tex.uScale = frameW / texW;
-tex.vScale = frameH / texH;
-
-// 🔥 OFFSET (CLAVE)
-tex.uOffset = frameX * tex.uScale;
-tex.vOffset = frameY * tex.vScale;
-
-mat.diffuseTexture = tex;
-
-mat.emissiveColor = new BABYLON.Color3(1,1,1);
-mat.backFaceCulling = false;
-mat.disableDepthWrite = true;
-
-m.material = mat;
-m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-m.renderingGroupId = 1;
-
-return m;
-}
+player = createSprite("assets/sprites/nave.png",4);
 player.position = new BABYLON.Vector3(0,0,0);
 
 // ===== INPUT =====
@@ -102,17 +65,16 @@ scene.onBeforeRenderObservable.add(()=>{
 
 let dt = engine.getDeltaTime()/1000;
 
-
-// 🔥 cámara FIJA
-camera.position.x = 0;
-camera.position.y = 0;
-
 // MOVIMIENTO
 if(pointerDown){
 let target = getMouseWorld();
 let dir = target.subtract(player.position).normalize();
 player.position.addInPlace(dir.scale(25*dt));
 }
+
+// ROTACIÓN (🔥 importante)
+let dirRot = getMouseWorld().subtract(player.position);
+player.rotation.z = Math.atan2(dirRot.y, dirRot.x);
 
 // DISPARO
 if(Date.now() - lastFire > 120){
@@ -144,7 +106,7 @@ let tex = new BABYLON.Texture(texture,scene);
 
 tex.hasAlpha = true;
 
-// 🔥 MOSTRAR SOLO 1 FRAME (64x64)
+// 🔥 CORTE REAL 64x64
 let frameSize = 64;
 tex.uScale = frameSize / tex.getSize().width;
 tex.vScale = frameSize / tex.getSize().height;
@@ -157,7 +119,6 @@ mat.disableDepthWrite = true;
 
 m.material = mat;
 m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-m.renderingGroupId = 1;
 
 m.position.z = 0;
 
@@ -176,7 +137,7 @@ function shootPlayer(){
 
 let b = createSprite("assets/sprites/laser.png",1);
 b.position = player.position.clone();
-b.position.z = -0.1;
+b.position.z = -1;
 
 b.dir = getMouseWorld().subtract(player.position).normalize();
 
@@ -218,29 +179,12 @@ e.position.addInPlace(dir.scale(speed*dt));
 // DISPARO
 if(Date.now()-e.lastFire > (e.type==3?2000:1000)){
 
-if(e.type==3){
-for(let a=0;a<360;a+=30){
-let b = createSprite("assets/sprites/laser3.png",1);
-b.position = e.position.clone();
-b.position.z = -0.1;
-
-b.dir = new BABYLON.Vector3(
-Math.cos(a*Math.PI/180),
-Math.sin(a*Math.PI/180),
-0
-);
-
-bulletsEnemy.push(b);
-}
-}else{
 let b = createSprite(`assets/sprites/laser${e.type}.png`,1);
 b.position = e.position.clone();
-b.position.z = -0.1;
-
+b.position.z = -1;
 b.dir = player.position.subtract(e.position).normalize();
 
 bulletsEnemy.push(b);
-}
 
 e.lastFire = Date.now();
 }
@@ -256,18 +200,6 @@ if(e.hp<=0){
 e.dispose();
 list.splice(i,1);
 score++;
-
-if(e.type==1 && score%3==0){
-let p = spawnOutside();
-createEnemy(2,p.x,p.y);
-}
-if(e.type==2 && score%6==0){
-let p = spawnOutside();
-createEnemy(3,p.x,p.y);
-}
-if(e.type==3){
-vida = Math.min(maxVida, vida*2);
-}
 }
 }
 });
@@ -287,77 +219,13 @@ bulletsEnemy.splice(bi,1);
 
 // ================= ASTEROIDES =================
 function spawnAsteroids(){
-let r = Math.random();
-
-if(r<0.6) createAst1();
-else if(r<0.85) createAst2();
-else createAst3();
-}
-
-function createAst1(){
 let p = spawnOutside();
 let a = createSprite("assets/sprites/asteroide.png",3);
 a.position = new BABYLON.Vector3(p.x,p.y,0);
-a.hp = 3;
 ast1.push(a);
 }
 
-function createAst2(){
-let p = spawnOutside();
-let a = createSprite("assets/sprites/asteroide2.png",2);
-a.position = new BABYLON.Vector3(p.x,p.y,0);
-a.vel = new BABYLON.Vector3(Math.random()*2-1,Math.random()*2-1,0).scale(20);
-ast2.push(a);
-}
-
-function createAst3(){
-let p = spawnOutside();
-let a = createSprite("assets/sprites/asteroide3.png",6);
-a.position = new BABYLON.Vector3(p.x,p.y,0);
-a.hp = 20;
-ast3.push(a);
-}
-
-function updateAsteroids(dt){
-
-ast2.forEach((a,i)=>{
-a.position.addInPlace(a.vel.scale(dt));
-if(dist(player,a)<3){
-vida -= 5;
-a.dispose();
-ast2.splice(i,1);
-}
-});
-
-ast1.forEach((a,i)=>{
-bulletsPlayer.forEach((b,bi)=>{
-if(dist(a,b)<2){
-a.hp--;
-b.dispose();
-bulletsPlayer.splice(bi,1);
-if(a.hp<=0){
-a.dispose();
-ast1.splice(i,1);
-}
-}
-});
-});
-
-ast3.forEach((a,i)=>{
-bulletsPlayer.forEach((b,bi)=>{
-if(dist(a,b)<2){
-a.hp--;
-b.dispose();
-bulletsPlayer.splice(bi,1);
-if(a.hp<=0){
-a.dispose();
-ast3.splice(i,1);
-}
-}
-});
-});
-
-}
+function updateAsteroids(dt){}
 
 // ================= UI =================
 function createUI(){
@@ -368,27 +236,13 @@ text.color = "white";
 text.fontSize = 24;
 text.top = "-45%";
 text.left = "-45%";
-text.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
 
 ui.addControl(text);
-
-let vidaBar = new BABYLON.GUI.Rectangle();
-vidaBar.height = "10px";
-vidaBar.width = "200px";
-vidaBar.background = "red";
-vidaBar.top = "-40%";
-vidaBar.left = "-45%";
-vidaBar.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-
-ui.addControl(vidaBar);
-
 ui.score = text;
-ui.vidaBar = vidaBar;
 }
 
 function updateUI(){
 ui.score.text = "Score: " + score;
-ui.vidaBar.width = (200 * (vida/maxVida)) + "px";
 }
 
 // ================= UTILS =================
@@ -415,14 +269,13 @@ function spawnOutside(){
 let side = Math.floor(Math.random()*4);
 let d = 80;
 
-if(side==0) return {x:player.position.x+80,y:player.position.y+(Math.random()*d-d/2)};
-if(side==1) return {x:player.position.x-80,y:player.position.y+(Math.random()*d-d/2)};
-if(side==2) return {x:player.position.x+(Math.random()*d-d/2),y:player.position.y+80};
-return {x:player.position.x+(Math.random()*d-d/2),y:player.position.y-80};
+if(side==0) return {x:80,y:Math.random()*d-d/2};
+if(side==1) return {x:-80,y:Math.random()*d-d/2};
+if(side==2) return {x:Math.random()*d-d/2,y:80};
+return {x:Math.random()*d-d/2,y:-80};
 }
 
 // ================= INIT =================
 scene = createScene();
-
 engine.runRenderLoop(()=> scene.render());
 window.addEventListener("resize",()=>engine.resize());
