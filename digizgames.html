@@ -1,50 +1,152 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-<link rel="stylesheet" href="estilos.css">
-    
+
 <meta charset="UTF-8">
-<title>Digiz Game Documento</title>
+<title>Digiz Games</title>
+
+<link rel="stylesheet" href="estilos.css">
 
 <style>
-body {
-    margin: 0;
-    padding: 40px;
-    background-image: url("fondo_digiz.jpg");
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    font-family: Arial, sans-serif;
+
+body{
+    margin:0;
+    padding:40px;
+    background-image:url("fondo_digiz.jpg");
+    background-size:cover;
+    background-position:center;
+    background-attachment:fixed;
+    font-family:Arial, sans-serif;
 }
 
-/* Texto principal */
-.contenido {
-    color: white;
-    font-size: 30px;
-    line-height: 1.5;
+/* Caja principal */
+
+.contenido{
     
-    /* Borde negro tipo contorno */
-   text-shadow: 
-        -6px -6px 0 #000,
-         6px -6px 0 #000,
-        -6px  6px 0 #000,
-         6px  6px 0 #000,
-        -8px  0px 0 #000,
-         8px  0px 0 #000,
-         0px -8px 0 #000,
-         0px  8px 0 #000,
-         10px  10px 16px #000;
-    
-    white-space: pre-wrap; /* Respeta espacios y saltos */
+    max-width:1100px;
+    margin:auto;
+
+    padding:40px;
+
+    background:rgba(0,0,0,0.65);
+
+    border-radius:25px;
+
+    color:white;
+
+    box-shadow:0px 0px 40px rgba(0,0,0,0.8);
+
 }
 
-/* Imagen inferior */
-.portal {
-    display: block;
-    margin: 50px auto;
-    width: 200px;
-    cursor: pointer;
+/* Títulos */
+
+h1{
+    font-size:70px;
+    text-align:center;
+    margin-bottom:10px;
+
+    text-shadow:
+    0px 0px 10px #000,
+    0px 0px 20px #000;
 }
+
+.subtitulo{
+    text-align:center;
+    font-size:28px;
+    margin-bottom:50px;
+    opacity:0.9;
+}
+
+h2{
+
+    margin-top:50px;
+    font-size:42px;
+
+    color:#ffd95e;
+
+    text-shadow:
+    0px 0px 10px #000;
+}
+
+h3{
+
+    margin-top:35px;
+    font-size:30px;
+
+    color:#7fe6ff;
+
+    text-shadow:
+    0px 0px 10px #000;
+}
+
+/* Texto */
+
+p, li{
+
+    font-size:24px;
+    line-height:1.8;
+
+    text-shadow:
+    2px 2px 5px #000;
+}
+
+/* Lista */
+
+ul{
+    padding-left:40px;
+}
+
+/* Imagen portal */
+
+.portal{
+
+    display:block;
+
+    margin:60px auto 0 auto;
+
+    width:220px;
+
+    transition:0.3s;
+
+    cursor:pointer;
+}
+
+.portal:hover{
+
+    transform:scale(1.1);
+}
+
+/* Responsive */
+
+@media(max-width:768px){
+
+    body{
+        padding:15px;
+    }
+
+    .contenido{
+        padding:25px;
+    }
+
+    h1{
+        font-size:45px;
+    }
+
+    h2{
+        font-size:32px;
+    }
+
+    h3{
+        font-size:25px;
+    }
+
+    p, li{
+        font-size:20px;
+    }
+
+}
+
 </style>
 
 </head>
@@ -52,97 +154,169 @@ body {
 <body>
 
 <!-- Música -->
+
 <audio id="musica" autoplay loop>
     <source src="digizgames_song.mp3" type="audio/mpeg">
 </audio>
 
 <script>
-// Forzar reproducción en navegadores que bloquean autoplay
-document.addEventListener("click", function() {
+
+document.addEventListener("click", function(){
+
     const audio = document.getElementById("musica");
     audio.play();
-}, { once: true });
+
+}, { once:true });
+
 </script>
 
-    
+<!-- CONTENIDO -->
+
 <div class="contenido">
-DIGIZ GAMES
-Juegos con identidad. Historias con carácter.
 
-En Digiz Games creamos experiencias diseñadas para jugadores adultos que buscan algo más que entretenimiento rápido.
+    <h1>DIGIZ GAMES</h1>
 
-Nuestros proyectos combinan narrativa, arte, desafío y personalidad propia, mezclando la esencia de los videojuegos clásicos con una visión moderna y autoral.
+    <div class="subtitulo">
+        Juegos con identidad. Historias con carácter.
+    </div>
 
-Aunque algunos de nuestros mundos puedan tener una estética caricaturesca o inspirada en la animación tradicional, detrás de cada juego existen temáticas profundas, personajes memorables y universos llenos de emoción, conflicto, humor, misterio y evolución.
+    <p>
+        En Digiz Games creamos experiencias diseñadas para jugadores adultos 
+        que buscan algo más que entretenimiento rápido.
+    </p>
 
-Nuestra visión
+    <p>
+        Nuestros proyectos combinan narrativa, arte, desafío y personalidad propia,
+        mezclando la esencia de los videojuegos clásicos con una visión moderna y autoral.
+    </p>
 
-Creemos que los videojuegos son universos vivos.
+    <p>
+        Aunque algunos de nuestros mundos puedan tener una estética caricaturesca 
+        o inspirada en la animación tradicional, detrás de cada juego existen 
+        temáticas profundas, personajes memorables y universos llenos de emoción,
+        conflicto, humor, misterio y evolución.
+    </p>
 
-Cada título de Digiz Games está pensado como una franquicia en expansión: historias conectadas, temporadas, personajes icónicos, arte conceptual y productos físicos que permiten que la experiencia continúe más allá de la pantalla.
+    <h2>Nuestra visión</h2>
 
-No buscamos crear juegos desechables.
-Buscamos crear mundos que las personas quieran recordar.
+    <p>
+        Creemos que los videojuegos son universos vivos.
+    </p>
 
-¿Qué define a Digiz Games?
-Narrativa envolvente
+    <p>
+        Cada título de Digiz Games está pensado como una franquicia en expansión:
+        historias conectadas, temporadas, personajes icónicos, arte conceptual y
+        productos físicos que permiten que la experiencia continúe más allá de la pantalla.
+    </p>
 
-Cada proyecto posee identidad propia, personajes reconocibles y una dirección narrativa clara.
-Nos inspiran las historias capaces de generar conexión emocional, teorías, fandom y comunidad.
+    <p>
+        No buscamos crear juegos desechables.
+        Buscamos crear mundos que las personas quieran recordar.
+    </p>
 
-Arte con personalidad
+    <h2>¿Qué define a Digiz Games?</h2>
 
-Nuestra identidad visual mezcla ilustración conceptual, animación expresiva y estética retro-contemporánea.
+    <h3>Narrativa envolvente</h3>
 
-La mayoría de nuestros proyectos utilizan un enfoque artístico 2D altamente estilizado, con atmósferas vivas, iluminación dinámica y una fuerte dirección visual.
+    <p>
+        Cada proyecto posee identidad propia, personajes reconocibles y una
+        dirección narrativa clara.
+    </p>
 
-Jugabilidad desafiante
+    <p>
+        Nos inspiran las historias capaces de generar conexión emocional,
+        teorías, fandom y comunidad.
+    </p>
 
-Amamos la esencia arcade y retro.
+    <h3>Arte con personalidad</h3>
 
-Creamos experiencias donde la habilidad, el aprendizaje y la progresión del jugador realmente importan. Nuestros juegos recuperan el espíritu clásico del desafío, evitando convertir la experiencia en algo automático o vacío.
+    <p>
+        Nuestra identidad visual mezcla ilustración conceptual,
+        animación expresiva y estética retro-contemporánea.
+    </p>
 
-Más que videojuegos
+    <p>
+        La mayoría de nuestros proyectos utilizan un enfoque artístico
+        2D altamente estilizado, con atmósferas vivas, iluminación dinámica
+        y una fuerte dirección visual.
+    </p>
 
-Digiz Games también desarrolla experiencias físicas y productos inspirados en sus universos creativos.
+    <h3>Jugabilidad desafiante</h3>
 
-Juegos de mesa y cartas
+    <p>
+        Amamos la esencia arcade y retro.
+    </p>
 
-Creamos juegos sociales, estratégicos y competitivos pensados para compartir entre amigos, desde experiencias tácticas hasta propuestas caóticas y humorísticas para adultos.
+    <p>
+        Creamos experiencias donde la habilidad, el aprendizaje y la progresión
+        del jugador realmente importan.
+    </p>
 
-Juegos de ingenio y creatividad
+    <h2>Más que videojuegos</h2>
 
-Diseñamos desafíos físicos, mecanismos, puzzles y conceptos experimentales enfocados en la imaginación, la lógica y la exploración creativa.
+    <p>
+        Digiz Games también desarrolla experiencias físicas y productos inspirados
+        en sus universos creativos.
+    </p>
 
-Un universo en expansión
+    <h3>Juegos de mesa y cartas</h3>
 
-Los personajes, historias y temporadas de Digiz Games están diseñados para evolucionar constantemente a través de:
+    <p>
+        Creamos juegos sociales, estratégicos y competitivos pensados para compartir.
+    </p>
 
-Videojuegos
-Arte conceptual
-Coleccionables
-Ropa y accesorios
-Ediciones limitadas
-Juegos físicos
-Contenido multimedia
+    <h3>Juegos de ingenio y creatividad</h3>
 
-Nuestro objetivo es construir una marca reconocible, creativa y auténtica, donde cada proyecto aporte a un universo mayor.
+    <p>
+        Diseñamos desafíos físicos, mecanismos, puzzles y conceptos experimentales
+        enfocados en imaginación, lógica y creatividad.
+    </p>
 
-Filosofía
+    <h2>Un universo en expansión</h2>
 
-Digiz Games nace de una idea simple:
+    <p>
+        Los personajes, historias y temporadas de Digiz Games están diseñados para evolucionar constantemente:
+    </p>
 
-Los juegos pueden ser divertidos, artísticos, desafiantes y emocionalmente significativos al mismo tiempo.
+    <ul>
+        <li>Videojuegos</li>
+        <li>Arte conceptual</li>
+        <li>Coleccionables</li>
+        <li>Ropa y accesorios</li>
+        <li>Ediciones limitadas</li>
+        <li>Juegos físicos</li>
+        <li>Contenido multimedia</li>
+    </ul>
 
-Queremos crear experiencias que mezclen imaginación, nostalgia, identidad visual fuerte y pasión por el diseño de mundos.
+    <p>
+        Nuestro objetivo es construir una marca reconocible,
+        creativa y auténtica.
+    </p>
 
-Bienvenido a Digiz Games.
+    <h2>Filosofía</h2>
+
+    <p>
+        Los juegos pueden ser divertidos, artísticos, desafiantes
+        y emocionalmente significativos al mismo tiempo.
+    </p>
+
+    <p>
+        Queremos crear experiencias que mezclen imaginación,
+        nostalgia, identidad visual fuerte y pasión por el diseño de mundos.
+    </p>
+
+    <p>
+        <strong>Bienvenido a Digiz Games.</strong>
+    </p>
 
 </div>
 
-<!-- Imagen portal -->
+<!-- Portal -->
+
 <a href="digiz_index.html">
+
     <img src="portal.png" class="portal" alt="Volver">
+
 </a>
 
 </body>
