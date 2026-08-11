@@ -1,1 +1,1530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero de Turnos · Combate v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#0a0d1a; --bg-panel:#131735; --bg-panel-2:#171c3f;
+    --border:#2a3169; --border-soft:#20264c;
+    --gold:#e0b84b; --gold-dim:#8a723a;
+    --ink:#eef0fb; --muted:#8b91b8;
+    --grid-a:#161b3a; --grid-b:#1b2148; --grid-line:#262d5c;
+    --playerA:#ef4460; --playerA-glow:rgba(239,68,96,.55);
+    --playerB:#35d7c0; --playerB-glow:rgba(53,215,192,.5);
+    --vit:#3ecf6e; --phys:#f5a445; --mag:#b06bf5;
+    --oscura:#8a4fd6; --divina:#e0d24b;
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0; height:100%;
+    background:
+      radial-gradient(1200px 700px at 15% -10%, #171d42 0%, transparent 60%),
+      radial-gradient(900px 600px at 110% 10%, #1a1440 0%, transparent 55%),
+      var(--bg-deep);
+    color:var(--ink); font-family:'Space Grotesk', sans-serif; overflow:hidden;
+  }
+  h1,h2,h3,.font-display{ font-family:'Cinzel', serif; letter-spacing:.02em; }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+  button, select, input{ font-family:inherit; }
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+  .hidden{ display:none !important; }
+
+  #app{ height:100vh; padding:14px; display:flex; flex-direction:column; gap:12px; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:9px 16px;
+    background:linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel)); border:1px solid var(--border-soft); border-radius:14px; flex-shrink:0; }
+  .topbar h1{ margin:0; font-size:18px; font-weight:700; color:var(--gold); display:flex; align-items:center; gap:9px; }
+  .topbar h1 .rune{ width:24px;height:24px;border:1.5px solid var(--gold-dim);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--gold); transform:rotate(45deg); }
+  .topbar h1 .rune span{ transform:rotate(-45deg); }
+  .wins-bar{ display:flex; gap:16px; align-items:center; font-size:12px; }
+  .wins-chip{ display:flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; border:1px solid var(--border); }
+  .wins-chip .dot{ width:9px;height:9px;border-radius:50%; }
+  .wins-chip b{ font-family:'JetBrains Mono',monospace; color:var(--gold); }
+
+  #mainArea{ flex:1; min-height:0; }
+
+  /* ===== SETUP ===== */
+  #setupScreen{ height:100%; display:flex; flex-direction:column; gap:12px; overflow:auto; padding-right:4px; }
+  .setup-cols{ display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+  .setup-card{ background:linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel)); border:1px solid var(--border-soft);
+    border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .setup-card.ready{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-dim), 0 0 22px rgba(224,184,75,.12); }
+  .setup-card h2{ margin:0; font-size:16px; display:flex; align-items:center; gap:8px; }
+  .setup-card h2 .swatch{ width:13px;height:13px;border-radius:50%; }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field label{ font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+  .field input[type=text]{ background:var(--grid-b); border:1px solid var(--border); border-radius:9px; color:var(--ink); padding:8px 10px; font-size:13px; outline:none; }
+  .field select{ background:var(--grid-b); border:1px solid var(--border); border-radius:9px; color:var(--ink); padding:7px 9px; font-size:12px; outline:none; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .derived{ font-size:11px; color:var(--muted); background:var(--grid-a); border:1px dashed var(--border-soft); border-radius:8px; padding:6px 9px; }
+  .derived b{ color:var(--gold); }
+
+  .pick-block{ border-top:1px solid var(--border-soft); padding-top:10px; }
+  .pick-block .label{ font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600; margin-bottom:7px; }
+  .pick-row{ display:flex; gap:8px; }
+  .pick-row select{ flex:1; }
+  .btn{ background:var(--gold-dim); color:#161226; border:none; border-radius:8px; padding:7px 13px; font-size:12px; font-weight:700; cursor:pointer; letter-spacing:.02em; transition:filter .12s ease, opacity .12s ease; }
+  .btn:hover{ filter:brightness(1.15); }
+  .btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .btn.ghost{ background:transparent; border:1px solid var(--border); color:var(--muted); }
+  .btn.ghost:hover{ color:var(--ink); border-color:var(--gold-dim); background:var(--grid-b); }
+  .btn.gold{ background:var(--gold); }
+  .btn.big{ font-size:14px; padding:11px 26px; }
+
+  .chip-list{ display:flex; flex-direction:column; gap:5px; margin-top:8px; min-height:18px; }
+  .chip{ display:flex; align-items:center; gap:7px; background:var(--grid-b); border:1px solid var(--border); border-radius:8px; padding:6px 9px; font-size:11.5px; }
+  .chip .cat{ font-size:8.5px; padding:2px 6px; border-radius:5px; text-transform:uppercase; letter-spacing:.04em; flex-shrink:0; }
+  .cat.fisica{ background:rgba(245,164,69,.18); color:var(--phys); }
+  .cat.magica{ background:rgba(176,107,245,.18); color:var(--mag); }
+  .cat.especial{ background:rgba(224,184,75,.18); color:var(--gold); }
+  .chip .nm{ flex:1; font-weight:600; }
+  .chip .x{ cursor:pointer; color:var(--muted); font-weight:700; padding:0 3px; }
+  .chip .x:hover{ color:var(--playerA); }
+  .cnt{ font-size:10.5px; color:var(--muted); margin-top:3px; }
+
+  .setup-footer{ display:flex; justify-content:center; padding:4px 0 12px 0; flex-shrink:0; }
+
+  /* ===== BATTLE ===== */
+  #battleScreen{ height:100%; display:grid; grid-template-columns:1fr 380px; gap:14px; }
+  .board-wrap{ position:relative; background:var(--bg-panel); border:1px solid var(--border-soft); border-radius:16px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  #board{ display:block; }
+  .coord-chip{ position:absolute; left:12px; bottom:12px; background:rgba(10,13,26,.72); border:1px solid var(--border); backdrop-filter:blur(4px); border-radius:10px; padding:6px 11px; font-size:11px; color:var(--muted); display:flex; gap:12px; }
+  .coord-chip b{ color:var(--ink); font-weight:600; }
+  .minimap-wrap{ position:absolute; top:12px; right:12px; background:rgba(10,13,26,.72); border:1px solid var(--border); border-radius:10px; padding:7px; backdrop-filter:blur(4px); }
+  .minimap-wrap .label{ font-size:9px; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; margin-bottom:5px; text-align:center;}
+  #minimap{ display:block; border-radius:5px; border:1px solid var(--border-soft); }
+  .log-chip{ position:absolute; top:12px; left:12px; max-width:300px; background:rgba(10,13,26,.8); border:1px solid var(--border); border-radius:10px; padding:8px 10px; backdrop-filter:blur(4px); }
+  .log-chip .label{ font-size:9px; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; margin-bottom:4px; }
+  #logList{ max-height:150px; overflow:auto; font-size:10.5px; line-height:1.5; color:var(--ink); display:flex; flex-direction:column-reverse; gap:2px; }
+
+  .sidebar{ display:flex; flex-direction:column; gap:10px; overflow:auto; padding-right:2px; }
+  .panel{ background:linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel)); border:1px solid var(--border-soft); border-radius:14px; padding:13px 15px; flex-shrink:0; }
+  .panel .label{ font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:0 0 8px 0; font-weight:600; }
+
+  #turnBanner{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; border:1px solid var(--border); transition:box-shadow .3s ease, border-color .3s ease; }
+  #turnBanner .token{ width:32px;height:32px;border-radius:50%; display:flex;align-items:center;justify-content:center; font-family:'Cinzel',serif; font-weight:700; font-size:14px; color:#0a0d1a; flex-shrink:0; }
+  #turnBanner .info .name{ font-family:'Cinzel',serif; font-weight:700; font-size:14px; }
+  #turnBanner .info .state{ font-size:10.5px; color:var(--muted); margin-top:1px; }
+  #turnBanner .info .role{ font-size:9.5px; margin-top:2px; letter-spacing:.05em; text-transform:uppercase; }
+  .role.atk{ color:var(--playerA); } .role.def{ color:var(--playerB); }
+
+  .bars-block{ display:flex; flex-direction:column; gap:6px; margin-bottom:9px; }
+  .bars-block:last-child{ margin-bottom:0; }
+  .bars-block .who{ font-size:11.5px; font-weight:700; display:flex; align-items:center; gap:6px; margin-bottom:1px; }
+  .bars-block .who .dot{ width:8px;height:8px;border-radius:50%; }
+  .bar-row{ display:flex; align-items:center; gap:7px; }
+  .bar-row .bl{ width:56px; font-size:9.5px; color:var(--muted); flex-shrink:0; }
+  .bar-track{ flex:1; height:9px; border-radius:5px; background:var(--grid-b); border:1px solid var(--border-soft); overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:5px; transition:width .25s ease; }
+  .bar-fill.vit{ background:linear-gradient(90deg, #1f8f45, var(--vit)); }
+  .bar-fill.phys{ background:linear-gradient(90deg, #b06f1f, var(--phys)); }
+  .bar-fill.mag{ background:linear-gradient(90deg, #6f2fb0, var(--mag)); }
+  .bar-num{ width:32px; text-align:right; font-size:9.5px; font-family:'JetBrains Mono',monospace; color:var(--muted); flex-shrink:0; }
+  .bar-row .ab{ width:18px;height:18px; border-radius:5px; border:1px solid var(--border); background:var(--grid-a); color:var(--ink); cursor:pointer; font-size:11px; line-height:1; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .bar-row .ab:hover:not(:disabled){ border-color:var(--gold-dim); background:var(--grid-b); }
+  .bar-row .ab:disabled{ opacity:.25; cursor:not-allowed; }
+
+  .creature-chip{ display:flex; align-items:center; gap:6px; font-size:10px; background:var(--grid-a); border:1px solid var(--border-soft); border-radius:7px; padding:4px 7px; margin-top:5px; }
+  .creature-chip .nm{ flex:1; font-weight:600; }
+  .creature-chip .lv{ color:var(--muted); }
+  .creature-chip .life-track{ width:44px; height:6px; border-radius:3px; background:var(--grid-b); overflow:hidden; }
+  .creature-chip .life-fill{ height:100%; background:var(--vit); }
+
+  .dice-gem{ position:relative; width:54px; height:54px; display:flex;align-items:center;justify-content:center; transform:rotate(45deg); border:2px solid var(--gold-dim); border-radius:14px; background:radial-gradient(circle at 30% 25%, #26305f, #12162e 70%); box-shadow: inset 0 0 10px rgba(0,0,0,.5); flex-shrink:0; margin:0 auto; }
+  .dice-gem.rolling{ animation: spin .45s linear infinite; border-color:var(--gold); }
+  .dice-gem span{ transform:rotate(-45deg); font-family:'Cinzel',serif; font-weight:800; font-size:19px; color:var(--gold); text-shadow:0 0 12px rgba(224,184,75,.5); }
+  @keyframes spin{ from{transform:rotate(45deg);} to{transform:rotate(405deg);} }
+
+  .dpad{ display:grid; grid-template-columns:46px 46px 46px; grid-template-rows:46px 46px 46px; gap:5px; justify-content:center; margin:8px auto 2px auto; }
+  .dpad-btn{ background:var(--grid-b); border:1px solid var(--border); border-radius:9px; color:var(--ink); display:flex;align-items:center;justify-content:center; font-size:16px; cursor:pointer; user-select:none; transition:background .12s ease, transform .06s ease, border-color .12s ease; }
+  .dpad-btn:hover:not(:disabled){ background:#232a54; border-color:var(--gold-dim); }
+  .dpad-btn:active:not(:disabled){ transform:scale(.9); background:var(--gold-dim); }
+  .dpad-btn:disabled{ opacity:.25; cursor:not-allowed; }
+  .dpad-btn.up{ grid-column:2; grid-row:1; } .dpad-btn.left{ grid-column:1; grid-row:2; }
+  .dpad-btn.center{ grid-column:2; grid-row:2; background:transparent; border:1px dashed var(--border-soft); cursor:default; font-size:10.5px; color:var(--muted); }
+  .dpad-btn.center:hover{ background:transparent; }
+  .dpad-btn.right{ grid-column:3; grid-row:2; } .dpad-btn.down{ grid-column:2; grid-row:3; }
+
+  .opt-row{ display:flex; align-items:center; gap:8px; background:var(--grid-b); border:1px solid var(--border); border-radius:8px; padding:8px 10px; cursor:pointer; font-size:11.5px; transition:border-color .12s ease; margin-bottom:6px; }
+  .opt-row:hover{ border-color:var(--gold-dim); }
+  .opt-row.disabled{ opacity:.35; cursor:not-allowed; }
+  .opt-row .n{ flex:1; font-weight:600; }
+  .opt-row .m{ color:var(--muted); font-size:9.5px; }
+
+  .phase-title{ font-size:12px; color:var(--gold); font-weight:700; margin-bottom:6px; }
+  .phase-help{ font-size:10.5px; color:var(--muted); margin-bottom:8px; line-height:1.4; }
+
+  /* ===== MODAL ===== */
+  .modal-overlay{ position:fixed; inset:0; background:rgba(6,7,16,.72); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .modal-card{ width:440px; max-width:92vw; max-height:86vh; overflow:auto; background:linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel)); border:1px solid var(--gold-dim); border-radius:16px; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  .modal-card h3{ margin:0 0 5px 0; font-size:16px; color:var(--gold); }
+  .modal-card p{ margin:0 0 12px 0; font-size:12px; color:var(--muted); line-height:1.5; }
+  .modal-footer{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+  .endgame p{ color:var(--ink); font-size:14px; text-align:center; }
+  .modal-extra{ margin:6px 0 12px 0; display:flex; align-items:center; gap:8px; font-size:11px; }
+  .modal-extra input[type=range]{ flex:1; }
+
+  @media (max-width: 980px){
+    #battleScreen{ grid-template-columns:1fr; grid-template-rows:48vh 1fr; }
+    .setup-cols{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="topbar">
+    <h1><span class="rune"><span>◆</span></span> Tablero de Turnos</h1>
+    <div class="wins-bar">
+      <div class="wins-chip"><span class="dot" style="background:var(--playerA)"></span>Victorias A <b id="winsA">0</b></div>
+      <div class="wins-chip"><span class="dot" style="background:var(--playerB)"></span>Victorias B <b id="winsB">0</b></div>
+    </div>
+  </div>
+
+  <div id="mainArea">
+    <!-- ============ SETUP ============ -->
+    <div id="setupScreen">
+      <div class="setup-cols">
+        <div class="setup-card" id="cardA">
+          <h2><span class="swatch" style="background:var(--playerA)"></span> Jugador A</h2>
+          <div class="field"><label>Nombre del personaje</label><input type="text" id="charName_A" maxlength="20" placeholder="Nombre"></div>
+          <div class="row2">
+            <div class="field"><label>Tríada física</label><select id="physTriad_A"></select></div>
+            <div class="field"><label>Tríada mágica</label><select id="magTriad_A"></select></div>
+          </div>
+          <div class="derived" id="derived_A">Movimiento máximo: <b>6</b> cuadros</div>
+
+          <div class="pick-block">
+            <div class="label">Técnicas (elige 5, sin repetir)</div>
+            <div class="pick-row"><select id="techSelect_A"></select><button class="btn" id="addTech_A">Añadir</button></div>
+            <div class="chip-list" id="techList_A"></div>
+            <div class="cnt"><span id="techCount_A">0</span>/5 técnicas</div>
+          </div>
+
+          <div class="pick-block">
+            <div class="label">Defensas (elige 3, sin repetir)</div>
+            <div class="pick-row"><select id="defSelect_A"></select><button class="btn" id="addDef_A">Añadir</button></div>
+            <div class="chip-list" id="defList_A"></div>
+            <div class="cnt"><span id="defCount_A">0</span>/3 defensas</div>
+          </div>
+
+          <button class="btn gold" id="saveA" style="margin-top:4px;">Guardar personaje</button>
+        </div>
+
+        <div class="setup-card" id="cardB">
+          <h2><span class="swatch" style="background:var(--playerB)"></span> Jugador B</h2>
+          <div class="field"><label>Nombre del personaje</label><input type="text" id="charName_B" maxlength="20" placeholder="Nombre"></div>
+          <div class="row2">
+            <div class="field"><label>Tríada física</label><select id="physTriad_B"></select></div>
+            <div class="field"><label>Tríada mágica</label><select id="magTriad_B"></select></div>
+          </div>
+          <div class="derived" id="derived_B">Movimiento máximo: <b>6</b> cuadros</div>
+
+          <div class="pick-block">
+            <div class="label">Técnicas (elige 5, sin repetir)</div>
+            <div class="pick-row"><select id="techSelect_B"></select><button class="btn" id="addTech_B">Añadir</button></div>
+            <div class="chip-list" id="techList_B"></div>
+            <div class="cnt"><span id="techCount_B">0</span>/5 técnicas</div>
+          </div>
+
+          <div class="pick-block">
+            <div class="label">Defensas (elige 3, sin repetir)</div>
+            <div class="pick-row"><select id="defSelect_B"></select><button class="btn" id="addDef_B">Añadir</button></div>
+            <div class="chip-list" id="defList_B"></div>
+            <div class="cnt"><span id="defCount_B">0</span>/3 defensas</div>
+          </div>
+
+          <button class="btn gold" id="saveB" style="margin-top:4px;">Guardar personaje</button>
+        </div>
+      </div>
+      <div class="setup-footer"><button class="btn big" id="startMatchBtn" disabled>Comenzar partida</button></div>
+    </div>
+
+    <!-- ============ BATTLE ============ -->
+    <div id="battleScreen" class="hidden">
+      <div class="board-wrap">
+        <canvas id="board"></canvas>
+        <div class="log-chip"><div class="label">Registro de combate</div><div id="logList"></div></div>
+        <div class="minimap-wrap"><div class="label">Mapa general</div><canvas id="minimap" width="110" height="110"></canvas></div>
+        <div class="coord-chip"><div>A &nbsp;<b id="coordA" class="mono">500,500</b></div><div>B &nbsp;<b id="coordB" class="mono">520,520</b></div></div>
+      </div>
+
+      <div class="sidebar">
+        <div class="panel">
+          <div class="label">Turno</div>
+          <div id="turnBanner">
+            <div class="token" id="turnToken">A</div>
+            <div class="info">
+              <div class="name" id="turnName">Jugador A</div>
+              <div class="role" id="turnRole"></div>
+              <div class="state" id="turnState">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="label">Barras y criaturas</div>
+          <div class="bars-block"><div class="who"><span class="dot" style="background:var(--playerA)"></span>Jugador A</div><div id="barsA"></div><div id="creaturesA"></div></div>
+          <div class="bars-block"><div class="who"><span class="dot" style="background:var(--playerB)"></span>Jugador B</div><div id="barsB"></div><div id="creaturesB"></div></div>
+        </div>
+
+        <div class="panel" id="phasePanel">
+          <div class="label">Acción del turno</div>
+          <div id="phaseContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ======================================================================
+   AUDIO — dados/moneda sintetizados (sin archivos externos)
+====================================================================== */
+let actx = null;
+function ac(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function playDiceSound(){
+  const c = ac(); if(!c) return;
+  const now = c.currentTime;
+  for (let i=0;i<4;i++){
+    const t = now + i*0.045;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type='square'; o.frequency.setValueAtTime(180+Math.random()*260, t);
+    g.gain.setValueAtTime(0.09,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.04);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+0.05);
+  }
+}
+function playCoinSound(){
+  const c = ac(); if(!c) return;
+  const now = c.currentTime;
+  [880,1320].forEach(function(f,i){
+    const t = now+i*0.09;
+    const o=c.createOscillator(), g=c.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(f,t);
+    g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+0.2);
+  });
+}
+
+/* ======================================================================
+   DATOS BASE
+====================================================================== */
+const MAP_SIZE=1000, CELL=34, CAM_EASE=0.18;
+
+const ELEMENTS=['Fuego','Tierra','Agua','Aire','Rayo'];
+const ELEMENT_CYCLE=['Fuego','Rayo','Aire','Tierra','Agua'];
+function elementBeats(a,b){ if(a===b) return 0; const i=ELEMENT_CYCLE.indexOf(a); const w1=ELEMENT_CYCLE[(i+1)%5], w2=ELEMENT_CYCLE[(i+2)%5]; return (b===w1||b===w2)?1:-1; }
+
+const DIRECTIONS=['Recto','Arriba→Abajo','Abajo→Arriba','Adentro→Afuera','Afuera→Adentro'];
+function dirBeats(a,b){ if(a===b) return 0; const i=DIRECTIONS.indexOf(a); const w1=DIRECTIONS[(i+1)%5], w2=DIRECTIONS[(i+2)%5]; return (b===w1||b===w2)?1:-1; }
+
+const TRIAD_PERMS=[[-1,0,1],[-1,1,0],[0,-1,1],[0,1,-1],[1,-1,0],[1,0,-1],[0,0,0]];
+const PHYS_LABELS=['Fuerza física','Velocidad corporal','Destreza/Precisión'];
+const MAGIC_LABELS=['Poder','Velocidad','Precisión'];
+
+const ELEM_NAMES = {
+  Agua:['Ataque de Burbujas','Ventisca Hielo','Tsunami'],
+  Fuego:['Llamaradas','Bola de Fuego','Incendio Infernal'],
+  Rayo:['Tormenta de Relámpagos','Impacto Trueno','Gran Rayo'],
+  Tierra:['Lluvia Rocas','Arenas Movedizas','Terremoto Grado 10'],
+  Aire:['Golpes de Viento','Tornado','Gran Huracán']
+};
+const TIER_PARAMS=[
+  {tier:'rapida',  dmg:1, spd:9, prec:50, costPerHit:1, range:[2,10], multi:true},
+  {tier:'normal',  dmg:5, spd:7, prec:70, cost:2,       range:[2,10]},
+  {tier:'potencia',dmg:9, spd:6, prec:90, cost:3,       range:[1,10]}
+];
+
+const TECH = {
+  golpe_debil:  { name:'Golpe débil',  cat:'fisica', dmg:1, spd:9, prec:80, cost:1, res:'phys', needsDir:true, range:[1,1] },
+  golpe_fuerte: { name:'Golpe fuerte', cat:'fisica', dmg:2, spd:8, prec:70, cost:2, res:'phys', needsDir:true, range:[1,1] },
+
+  detener:     { name:'Detener el Tiempo', cat:'especial', spd:9, prec:50, cost:3, res:'mag', range:[1,10], effect:'paralyze' },
+  telekinesis: { name:'Telekinesis', cat:'especial', res:'mag', range:[1,10], effect:'telekinesis', variable:true, spd:8, prec:75 },
+  telepatico:  { name:'Control Telepático', cat:'especial', res:'mag', effect:'telepatico', variable:true },
+  imitacion:   { name:'Imitación', cat:'especial', res:'mag', cost:2, effect:'imitacion' },
+  oscura:      { name:'Invocación Oscura', cat:'especial', res:'mag', effect:'invocar_oscura', variable:true, spd:9, prec:100 },
+  divina:      { name:'Invocación Divina', cat:'especial', res:'mag', effect:'invocar_divina', variable:true, spd:9, prec:100 }
+};
+ELEMENTS.forEach(function(el){
+  TIER_PARAMS.forEach(function(tp,i){
+    const id = el.toLowerCase()+'_'+tp.tier;
+    TECH[id] = Object.assign({ name:ELEM_NAMES[el][i], cat:'magica', res:'mag', element:el, needsElem:false }, tp);
+  });
+});
+
+const DEF = {
+  defender:      { name:'Defender', kind:'block', min:1, max:5, res:'phys' },
+  evadir:        { name:'Evadir', kind:'evade', cost:1, res:'phys' },
+  escudo_agua:   { name:'Escudo de Agua', kind:'elemental', element:'Agua', res:'mag' },
+  escudo_fuego:  { name:'Escudo de Fuego', kind:'elemental', element:'Fuego', res:'mag' },
+  escudo_tierra: { name:'Escudo de Tierra', kind:'elemental', element:'Tierra', res:'mag' },
+  escudo_rayo:   { name:'Escudo de Rayo', kind:'elemental', element:'Rayo', res:'mag' },
+  escudo_aire:   { name:'Escudo de Aire', kind:'elemental', element:'Aire', res:'mag' },
+  escudo_sagrado:{ name:'Escudo Sagrado', kind:'sagrado', cost:3, res:'mag' }
+};
+
+/* ---- Criaturas ---- */
+function T(range,effect,desc){ return {range:range, effect:effect, desc:desc}; }
+const CREATURES = {
+  oscura: {
+    1:[
+      {name:'Fantasma Gruñón', life:3, table:[T([1,4],'dmg5','Ataca 5V'),T([5,7],'sleep','Duerme'),T([8,9],'dmgOwner2','Se revela y ataca 2V a su invocador'),T([10,12],'leave','Se va')]},
+      {name:'Fantasma Amigable', life:3, table:[T([1,5],'healVit3','Recupera +3 vital'),T([6,7],'sleep','Duerme'),T([8,9],'healPhys2','Recupera +2 energía física'),T([10,12],'leave','Se va')]}
+    ],
+    2:[
+      {name:'Demonio Oscuro', life:6, table:[T([1,5],'dmg5','Daño 5V'),T([6,8],'dmg3','Daño 3V'),T([9,12],'leave','Se va')]},
+      {name:'Demonio Sombrío', life:6, table:[T([1,3],'lockOpp','Anula técnica al azar del rival'),T([4,6],'lockOwn','Anula técnica propia al azar'),T([7,10],'sleep','Duerme'),T([11,12],'leave','Se va')]}
+    ],
+    3:[
+      {name:'Sith, el Dios del Infierno', life:9, table:[T([1,1],'dmg6','Daño 6V'),T([2,4],'drainPhys2','Resta 2 E. física'),T([5,6],'drainMag1','Resta 1 E. mágica'),T([7,8],'sleep','Se distrae'),T([9,12],'leave','Se va')]},
+      {name:'Molch, Demonio Infernal', life:9, table:[T([1,3],'dmg3','Daño 3V'),T([4,5],'leave','Se va'),T([6,6],'dmgBoth3','Daña a ambos 3V'),T([7,9],'dmg1','Daño 1V'),T([10,10],'dmg5','Daño 5V'),T([11,12],'leave','Se va')]}
+    ]
+  },
+  divina: {
+    1:[
+      {name:'Hada de los Sueños', life:3, table:[T([1,3],'sleepOpp','Duerme al rival 1 turno'),T([4,5],'sleepOwner','Duerme al jugador propio 1 turno'),T([6,9],'sleep','Duerme'),T([10,12],'leave','Se va')]},
+      {name:'Elfo Travieso', life:3, dice:13, table:[T([1,3],'leave','Se va'),T([4,6],'sleep','Se distrae'),T([7,10],'healVit5Phys5','Recupera +5 vital y +5 E. física'),T([11,13],'dmgOwner1','Golpea al jugador propio 1V')]}
+    ],
+    2:[
+      {name:'Ángel Sagrado', life:6, table:[T([1,5],'healVitFull','Recupera la vida a 10'),T([6,6],'healMagFull','Recupera la magia a 10'),T([7,12],'leave','Se va')]},
+      {name:'Ángel Protector', life:6, table:[T([1,5],'nullifyNext','Anula totalmente el daño del próximo ataque enemigo'),T([6,7],'banish12','Espanta las criaturas N1 y N2 del rival'),T([8,12],'leave','Se va')]}
+    ],
+    3:[
+      {name:'Dios del Tiempo', life:9, table:[T([1,1],'restoreVitals','Recupera los estados vitales al turno anterior'),T([2,6],'leave','Se va'),T([7,12],'sleep','Observa')]},
+      {name:'Dios del Conocimiento', life:9, table:[T([1,3],'freeTech','Permite usar cualquier técnica (menos invocaciones)'),T([4,6],'healMag10','Recupera 10 E. mágica'),T([7,8],'sleep','Observa'),T([9,12],'leave','Se va')]}
+    ]
+  }
+};
+
+function moveMaxFromVel(v){ return v===-1?3 : v===1?9 : 6; }
+function randInt(n){ return Math.floor(Math.random()*n); }
+function randChoice(arr){ return arr[randInt(arr.length)]; }
+function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
+function dist(p1,p2){ return Math.max(Math.abs(p1.col-p2.col), Math.abs(p1.row-p2.row)); }
+function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+/* ======================================================================
+   JUGADORES
+====================================================================== */
+function freshPlayer(key){
+  return {
+    key:key, name:'',
+    color: key==='A'?getVar('--playerA'):getVar('--playerB'),
+    glow:  key==='A'?getVar('--playerA-glow'):getVar('--playerB-glow'),
+    letter:key,
+    col: key==='A'?500:520, row: key==='A'?500:520,
+    attrPhys:{fuerza:0,velocidad:0,destreza:0}, attrMagic:{poder:0,velocidad:0,precision:0},
+    maxMove:6, loadout:[], defenses:[],
+    vit:10, phys:10, mag:10,
+    wins:0, lastDirection:null, paralyzed:false, shieldNext:false, ready:false,
+    lockedTechs:{}, // slotIdx -> turnos restantes
+    creatures:[]
+  };
+}
+let players = { A:freshPlayer('A'), B:freshPlayer('B') };
+let winsA=0, winsB=0;
+let allCreatures = []; // lista global {ownerKey,...}
+
+/* ======================================================================
+   SETUP UI
+====================================================================== */
+const setupDraft = { A:mkDraft(), B:mkDraft() };
+function mkDraft(){ return { physIdx:0, magIdx:0, techs:[], defs:[] }; }
+
+function triadLabel(labels, idx){
+  const p = TRIAD_PERMS[idx];
+  function fmt(v){ return v>0?('+'+v):String(v); }
+  return labels.map(function(l,i){ return l+' '+fmt(p[i]); }).join(' · ');
+}
+function buildSelect(id, options, valueFn, labelFn){
+  const sel = document.getElementById(id); sel.innerHTML='';
+  options.forEach(function(o,i){
+    const opt=document.createElement('option'); opt.value=valueFn(o,i); opt.textContent=labelFn(o,i); sel.appendChild(opt);
+  });
+}
+
+function setupPlayerUI(key){
+  buildSelect('physTriad_'+key, TRIAD_PERMS, function(_,i){return i;}, function(_,i){return triadLabel(PHYS_LABELS,i);});
+  buildSelect('magTriad_'+key, TRIAD_PERMS, function(_,i){return i;}, function(_,i){return triadLabel(MAGIC_LABELS,i);});
+  refreshTechSelect(key);
+  refreshDefSelect(key);
+  updateDerived(key);
+
+  document.getElementById('physTriad_'+key).addEventListener('change', function(){ setupDraft[key].physIdx=+this.value; updateDerived(key); });
+  document.getElementById('magTriad_'+key).addEventListener('change', function(){ setupDraft[key].magIdx=+this.value; });
+  document.getElementById('addTech_'+key).addEventListener('click', function(){ addTech(key); });
+  document.getElementById('addDef_'+key).addEventListener('click', function(){ addDef(key); });
+  document.getElementById('save'+key).addEventListener('click', function(){ saveCharacter(key); });
+}
+
+function techGroupLabel(cat, element){
+  if (cat==='fisica') return 'Físicas';
+  if (cat==='especial') return 'Mágicas especiales';
+  return element;
+}
+function refreshTechSelect(key){
+  const draft = setupDraft[key];
+  const sel = document.getElementById('techSelect_'+key);
+  sel.innerHTML='';
+  const groups = {};
+  Object.keys(TECH).forEach(function(id){
+    if (draft.techs.indexOf(id)>=0) return; // ya elegida: no repetir
+    const t = TECH[id];
+    const g = techGroupLabel(t.cat, t.element);
+    if (!groups[g]) groups[g]=[];
+    groups[g].push(id);
+  });
+  const order = ['Físicas','Agua','Fuego','Rayo','Tierra','Aire','Mágicas especiales'];
+  order.forEach(function(g){
+    if (!groups[g]) return;
+    const og=document.createElement('optgroup'); og.label=g;
+    groups[g].forEach(function(id){
+      const opt=document.createElement('option'); opt.value=id; opt.textContent=TECH[id].name; og.appendChild(opt);
+    });
+    sel.appendChild(og);
+  });
+}
+function refreshDefSelect(key){
+  const draft = setupDraft[key];
+  const sel = document.getElementById('defSelect_'+key);
+  sel.innerHTML='';
+  Object.keys(DEF).forEach(function(id){
+    if (draft.defs.indexOf(id)>=0) return;
+    const opt=document.createElement('option'); opt.value=id; opt.textContent=DEF[id].name; sel.appendChild(opt);
+  });
+}
+function updateDerived(key){
+  const vel = TRIAD_PERMS[setupDraft[key].physIdx][1];
+  document.getElementById('derived_'+key).innerHTML = 'Movimiento máximo: <b>'+moveMaxFromVel(vel)+'</b> cuadros';
+}
+
+function addTech(key){
+  const draft = setupDraft[key];
+  if (draft.techs.length>=5) return;
+  const id = document.getElementById('techSelect_'+key).value;
+  if (!id) return;
+  draft.techs.push(id);
+  renderTechChips(key); refreshTechSelect(key);
+}
+function removeTech(key, id){
+  const draft = setupDraft[key];
+  draft.techs.splice(draft.techs.indexOf(id),1);
+  renderTechChips(key); refreshTechSelect(key);
+}
+function renderTechChips(key){
+  const draft = setupDraft[key];
+  const list = document.getElementById('techList_'+key); list.innerHTML='';
+  draft.techs.forEach(function(id){
+    const t = TECH[id];
+    const row = document.createElement('div'); row.className='chip';
+    row.innerHTML = '<span class="cat '+t.cat+'">'+t.cat+'</span><span class="nm">'+t.name+'</span><span class="x">✕</span>';
+    row.querySelector('.x').addEventListener('click', function(){ removeTech(key,id); });
+    list.appendChild(row);
+  });
+  document.getElementById('techCount_'+key).textContent = draft.techs.length;
+  const full = draft.techs.length>=5;
+  document.getElementById('addTech_'+key).disabled = full;
+  document.getElementById('techSelect_'+key).disabled = full;
+}
+
+function addDef(key){
+  const draft = setupDraft[key];
+  if (draft.defs.length>=3) return;
+  const id = document.getElementById('defSelect_'+key).value;
+  if (!id) return;
+  draft.defs.push(id);
+  renderDefChips(key); refreshDefSelect(key);
+}
+function removeDef(key, id){
+  const draft = setupDraft[key];
+  draft.defs.splice(draft.defs.indexOf(id),1);
+  renderDefChips(key); refreshDefSelect(key);
+}
+function renderDefChips(key){
+  const draft = setupDraft[key];
+  const list = document.getElementById('defList_'+key); list.innerHTML='';
+  draft.defs.forEach(function(id){
+    const d = DEF[id];
+    const row = document.createElement('div'); row.className='chip';
+    row.innerHTML = '<span class="cat especial">def</span><span class="nm">'+d.name+'</span><span class="x">✕</span>';
+    row.querySelector('.x').addEventListener('click', function(){ removeDef(key,id); });
+    list.appendChild(row);
+  });
+  document.getElementById('defCount_'+key).textContent = draft.defs.length;
+  const full = draft.defs.length>=3;
+  document.getElementById('addDef_'+key).disabled = full;
+  document.getElementById('defSelect_'+key).disabled = full;
+}
+
+function saveCharacter(key){
+  const draft = setupDraft[key];
+  const name = document.getElementById('charName_'+key).value.trim();
+  if (!name){ alert('Ponle un nombre a tu personaje.'); return; }
+  if (draft.techs.length<5){ alert('Debes elegir 5 técnicas.'); return; }
+  if (draft.defs.length<3){ alert('Debes elegir 3 defensas.'); return; }
+
+  const p = players[key];
+  p.name = name.slice(0,20);
+  const pp = TRIAD_PERMS[draft.physIdx];
+  p.attrPhys = { fuerza:pp[0], velocidad:pp[1], destreza:pp[2] };
+  const mp = TRIAD_PERMS[draft.magIdx];
+  p.attrMagic = { poder:mp[0], velocidad:mp[1], precision:mp[2] };
+  p.maxMove = moveMaxFromVel(pp[1]);
+  p.loadout = draft.techs.slice();
+  p.defenses = draft.defs.slice();
+  p.ready = true;
+
+  document.getElementById('card'+key).classList.add('ready');
+  ['charName_'+key,'physTriad_'+key,'magTriad_'+key,'techSelect_'+key,'addTech_'+key,
+   'defSelect_'+key,'addDef_'+key,'save'+key].forEach(function(id){ document.getElementById(id).disabled=true; });
+
+  document.getElementById('startMatchBtn').disabled = !(players.A.ready && players.B.ready);
+}
+
+function resetSetupScreen(){
+  players.A = freshPlayer('A'); players.A.wins = winsA;
+  players.B = freshPlayer('B'); players.B.wins = winsB;
+  setupDraft.A = mkDraft(); setupDraft.B = mkDraft();
+  allCreatures = [];
+
+  ['A','B'].forEach(function(key){
+    document.getElementById('card'+key).classList.remove('ready');
+    document.getElementById('charName_'+key).value='';
+    ['charName_'+key,'physTriad_'+key,'magTriad_'+key,'techSelect_'+key,'addTech_'+key,
+     'defSelect_'+key,'addDef_'+key,'save'+key].forEach(function(id){ document.getElementById(id).disabled=false; });
+    document.getElementById('physTriad_'+key).value=0; document.getElementById('magTriad_'+key).value=0;
+    updateDerived(key);
+    renderTechChips(key); refreshTechSelect(key);
+    renderDefChips(key); refreshDefSelect(key);
+  });
+  document.getElementById('startMatchBtn').disabled = true;
+  document.getElementById('battleScreen').classList.add('hidden');
+  document.getElementById('setupScreen').classList.remove('hidden');
+}
+
+setupPlayerUI('A'); setupPlayerUI('B');
+document.getElementById('startMatchBtn').addEventListener('click', function(){
+  document.getElementById('setupScreen').classList.add('hidden');
+  document.getElementById('battleScreen').classList.remove('hidden');
+  resizeCanvas();
+  initBattle();
+});
+
+/* ======================================================================
+   TABLERO
+====================================================================== */
+const boardWrap=document.querySelector('.board-wrap');
+const canvas=document.getElementById('board'); const ctx=canvas.getContext('2d');
+const dpr = window.devicePixelRatio||1;
+const mini=document.getElementById('minimap'); const mctx=mini.getContext('2d');
+let camCol=500, camRow=500;
+let focusKey='A';
+
+function resizeCanvas(){
+  const rect=boardWrap.getBoundingClientRect();
+  const w=Math.max(300,Math.floor(rect.width)), h=Math.max(300,Math.floor(rect.height));
+  canvas.width=w*dpr; canvas.height=h*dpr; canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resizeCanvas);
+
+function drawLoop(){
+  const w=canvas.width/dpr, h=canvas.height/dpr;
+  const colsVisible=w/CELL, rowsVisible=h/CELL;
+  const target = players[focusKey];
+  let targetCol = clamp(target.col, colsVisible/2, MAP_SIZE-colsVisible/2);
+  let targetRow = clamp(target.row, rowsVisible/2, MAP_SIZE-rowsVisible/2);
+  camCol += (targetCol-camCol)*CAM_EASE; camRow += (targetRow-camRow)*CAM_EASE;
+  const topLeftCol=camCol-colsVisible/2, topLeftRow=camRow-rowsVisible/2;
+
+  ctx.clearRect(0,0,w,h);
+  const firstCol=Math.floor(topLeftCol)-1, lastCol=Math.ceil(topLeftCol+colsVisible)+1;
+  const firstRow=Math.floor(topLeftRow)-1, lastRow=Math.ceil(topLeftRow+rowsVisible)+1;
+  for (let r=firstRow;r<=lastRow;r++){ if (r<0||r>=MAP_SIZE) continue;
+    for (let c=firstCol;c<=lastCol;c++){ if (c<0||c>=MAP_SIZE) continue;
+      const px=(c-topLeftCol)*CELL, py=(r-topLeftRow)*CELL;
+      ctx.fillStyle = ((r+c)%2===0)?getVar('--grid-a'):getVar('--grid-b');
+      ctx.fillRect(px,py,CELL,CELL);
+    }
+  }
+  ctx.strokeStyle=getVar('--grid-line'); ctx.lineWidth=1; ctx.beginPath();
+  for (let c=firstCol;c<=lastCol;c++){ const px=Math.round((c-topLeftCol)*CELL)+.5; ctx.moveTo(px,0); ctx.lineTo(px,h); }
+  for (let r=firstRow;r<=lastRow;r++){ const py=Math.round((r-topLeftRow)*CELL)+.5; ctx.moveTo(0,py); ctx.lineTo(w,py); }
+  ctx.stroke();
+
+  // criaturas
+  allCreatures.forEach(function(cr){
+    const px=(cr.col-topLeftCol)*CELL+CELL/2, py=(cr.row-topLeftRow)*CELL+CELL/2;
+    if (px<-CELL||px>w+CELL||py<-CELL||py>h+CELL) return;
+    ctx.save();
+    ctx.fillStyle = cr.kind==='oscura'?getVar('--oscura'):getVar('--divina');
+    ctx.globalAlpha=.85;
+    ctx.beginPath(); ctx.arc(px,py,CELL*0.24,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+
+  ['A','B'].forEach(function(key){
+    const p=players[key];
+    const px=(p.col-topLeftCol)*CELL+CELL/2, py=(p.row-topLeftRow)*CELL+CELL/2;
+    if (px<-CELL||px>w+CELL||py<-CELL||py>h+CELL) return;
+    ctx.save(); ctx.shadowColor=p.glow; ctx.shadowBlur=key===focusKey?22:8;
+    ctx.beginPath(); ctx.arc(px,py,CELL*0.36,0,Math.PI*2); ctx.fillStyle=p.color; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle=key===focusKey?'#fff':'rgba(255,255,255,.35)'; ctx.stroke(); ctx.restore();
+    ctx.fillStyle='#0a0d1a'; ctx.font='700 13px Space Grotesk'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(p.letter, px, py+1);
+  });
+
+  drawMinimap();
+  requestAnimationFrame(drawLoop);
+}
+function drawMinimap(){
+  const w=mini.width, h=mini.height;
+  mctx.clearRect(0,0,w,h); mctx.fillStyle=getVar('--grid-a'); mctx.fillRect(0,0,w,h);
+  const scale=w/MAP_SIZE;
+  ['A','B'].forEach(function(key){
+    const p=players[key];
+    mctx.beginPath(); mctx.arc(p.col*scale,p.row*scale,3,0,Math.PI*2); mctx.fillStyle=p.color; mctx.fill();
+  });
+  const w2=canvas.width/dpr, h2=canvas.height/dpr;
+  const colsVisible=w2/CELL, rowsVisible=h2/CELL;
+  const tlc=clamp(camCol,colsVisible/2,MAP_SIZE-colsVisible/2)-colsVisible/2;
+  const tlr=clamp(camRow,rowsVisible/2,MAP_SIZE-rowsVisible/2)-rowsVisible/2;
+  mctx.strokeStyle=getVar('--gold'); mctx.lineWidth=1;
+  mctx.strokeRect(tlc*scale,tlr*scale,colsVisible*scale,rowsVisible*scale);
+}
+
+/* ---- posicionamiento de criaturas en anillos alrededor del dueño ---- */
+function ringCells(cx,cy,k){
+  const cells=[];
+  for (let dx=-k;dx<=k;dx++){
+    cells.push([cx+dx, cy-k]); cells.push([cx+dx, cy+k]);
+  }
+  for (let dy=-k+1;dy<=k-1;dy++){
+    cells.push([cx-k, cy+dy]); cells.push([cx+k, cy+dy]);
+  }
+  return cells.filter(function(c){ return c[0]>=0&&c[0]<MAP_SIZE&&c[1]>=0&&c[1]<MAP_SIZE; });
+}
+function reflowCreatures(ownerKey){
+  const owner = players[ownerKey];
+  const occupied = {};
+  ['A','B'].forEach(function(k){ occupied[players[k].col+','+players[k].row]=true; });
+  const mine = allCreatures.filter(function(c){ return c.ownerKey===ownerKey; });
+  const others = allCreatures.filter(function(c){ return c.ownerKey!==ownerKey; });
+  others.forEach(function(c){ occupied[c.col+','+c.row]=true; });
+  mine.forEach(function(cr){
+    let k=1, placed=false;
+    while(!placed && k<40){
+      const cells = ringCells(owner.col, owner.row, k);
+      for (let i=0;i<cells.length;i++){
+        const key = cells[i][0]+','+cells[i][1];
+        if (!occupied[key]){ cr.col=cells[i][0]; cr.row=cells[i][1]; occupied[key]=true; placed=true; break; }
+      }
+      k++;
+    }
+  });
+}
+
+/* ======================================================================
+   HUD
+====================================================================== */
+const el = {
+  turnToken:document.getElementById('turnToken'), turnName:document.getElementById('turnName'),
+  turnRole:document.getElementById('turnRole'), turnState:document.getElementById('turnState'),
+  turnBanner:document.getElementById('turnBanner'),
+  coordA:document.getElementById('coordA'), coordB:document.getElementById('coordB'),
+  phaseContent:document.getElementById('phaseContent'),
+  logList:document.getElementById('logList'), winsA:document.getElementById('winsA'), winsB:document.getElementById('winsB')
+};
+
+function barRow(labelTxt,cls,value,key,barKey,allocatable){
+  const pct=(value/10)*100; let btns='';
+  if (allocatable) btns = '<button class="ab" data-key="'+key+'" data-bar="'+barKey+'" data-d="-1">−</button><button class="ab" data-key="'+key+'" data-bar="'+barKey+'" data-d="1">+</button>';
+  return '<div class="bar-row"><div class="bl">'+labelTxt+'</div><div class="bar-track"><div class="bar-fill '+cls+'" style="width:'+pct+'%"></div></div><div class="bar-num mono">'+value+'/10</div>'+btns+'</div>';
+}
+function renderBars(){
+  ['A','B'].forEach(function(key){
+    const p=players[key];
+    const allocatable = (match.phase==='ECO_ENERGY' && match.econKey===key);
+    document.getElementById('bars'+key).innerHTML =
+      barRow('Vitalidad','vit',p.vit,key,'vit',allocatable)+
+      barRow('E. física','phys',p.phys,key,'phys',allocatable)+
+      barRow('E. mágica','mag',p.mag,key,'mag',allocatable);
+    const crList = allCreatures.filter(function(c){ return c.ownerKey===key; });
+    document.getElementById('creatures'+key).innerHTML = crList.map(function(cr){
+      return '<div class="creature-chip"><span class="nm">'+cr.name+'</span><span class="lv">N'+cr.level+'</span>'+
+        '<div class="life-track"><div class="life-fill" style="width:'+(cr.life/cr.maxLife*100)+'%"></div></div></div>';
+    }).join('');
+  });
+  document.querySelectorAll('.ab').forEach(function(btn){
+    btn.addEventListener('click', function(){ allocateEnergy(this.getAttribute('data-key'), this.getAttribute('data-bar'), +this.getAttribute('data-d')); });
+  });
+}
+function refreshTop(){
+  el.winsA.textContent=winsA; el.winsB.textContent=winsB;
+  el.coordA.textContent=players.A.col+','+players.A.row;
+  el.coordB.textContent=players.B.col+','+players.B.row;
+  const p = players[match.displayKey||match.econKey||match.offensiveKey||'A'];
+  el.turnToken.style.background=p.color; el.turnToken.textContent=p.letter;
+  el.turnName.textContent = p.name||('Jugador '+p.letter);
+  el.turnBanner.style.borderColor=p.color; el.turnBanner.style.boxShadow='0 0 16px '+p.glow;
+  if (match.offensiveKey){
+    el.turnRole.innerHTML = p.key===match.offensiveKey ? '<span class="role atk">Ofensiva</span>' : '<span class="role def">Defensa</span>';
+  } else el.turnRole.textContent='';
+  renderBars();
+}
+function log(msg){
+  const d=document.createElement('div'); d.textContent=msg;
+  el.logList.insertBefore(d, el.logList.firstChild);
+  while (el.logList.children.length>50) el.logList.removeChild(el.logList.lastChild);
+}
+function otherKey(k){ return k==='A'?'B':'A'; }
+
+/* ======================================================================
+   MODAL helper
+====================================================================== */
+function showModal(html){
+  const root=document.getElementById('modalRoot');
+  root.innerHTML = '<div class="modal-overlay"><div class="modal-card">'+html+'</div></div>';
+  return root.querySelector('.modal-card');
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+/* ======================================================================
+   MÁQUINA DE ESTADOS DE LA PARTIDA
+====================================================================== */
+let match = {
+  phase:'GENERAL_ROLL', // GENERAL_ROLL, ECO_CREATURES, ECO_ENERGY, ECO_MOVEMENT, ATTACK_CHOICE, DEFENSE_CHOICE, done
+  econQueue:[], econKey:null, displayKey:null,
+  offensiveKey:null, defensiveKey:null,
+  moveMax:0, stepsRemaining:0, stepsTotal:0, trail:[],
+  energyTotal:0, energyPool:0,
+  pendingAttack:null, // {attackerKey, techId, extra}
+  pendingResponse:null // {defenderKey, mode:'attack'|'defend', techId?, defId?, amount?}
+};
+
+function initBattle(){
+  players.A.col=500; players.A.row=500; players.B.col=520; players.B.row=520;
+  ['A','B'].forEach(function(k){
+    const p=players[k];
+    p.vit=10; p.phys=10; p.mag=10; p.lastDirection=null; p.paralyzed=false; p.shieldNext=false; p.lockedTechs={};
+  });
+  allCreatures=[];
+  focusKey='A';
+  camCol=players.A.col; camRow=players.A.row;
+  el.logList.innerHTML='';
+  startGeneralRoll();
+}
+
+/* ---------- LANZAMIENTO GENERAL ---------- */
+function startGeneralRoll(){
+  match.phase='GENERAL_ROLL';
+  match.displayKey = null;
+  refreshTop();
+  el.turnState.textContent='Lanzamiento general';
+  const html =
+    '<div class="phase-title">Lanzamiento general (1 a 5)</div>'+
+    '<div class="phase-help">Ambos jugadores lanzan; el mayor decide si ataca o cede la ofensiva. Empate: se repite.</div>'+
+    '<button class="btn gold" id="rollGeneral" style="width:100%;">🎲 LANZAR</button>'+
+    '<div id="generalResult" style="margin-top:10px; font-size:12px; color:var(--muted);"></div>';
+  el.phaseContent.innerHTML = html;
+  document.getElementById('rollGeneral').addEventListener('click', function(){
+    playDiceSound();
+    const a = 1+randInt(5), b = 1+randInt(5);
+    document.getElementById('generalResult').innerHTML =
+      'Jugador A: <b class="mono">'+a+'</b> &nbsp;·&nbsp; Jugador B: <b class="mono">'+b+'</b>';
+    if (a===b){
+      log('Lanzamiento general: empate ('+a+'-'+b+'). Se repite.');
+      return;
+    }
+    const winner = a>b ? 'A' : 'B';
+    log('Lanzamiento general: A='+a+' B='+b+'. Gana '+players[winner].name+'.');
+    offerAttackOrDefend(winner);
+  });
+}
+
+function offerAttackOrDefend(winnerKey){
+  match.displayKey = winnerKey;
+  const p = players[winnerKey];
+  el.phaseContent.innerHTML =
+    '<div class="phase-title">'+p.name+' ganó el lanzamiento</div>'+
+    '<div class="phase-help">¿Quiere atacar este turno o ceder la ofensiva al rival?</div>'+
+    '<div style="display:flex; gap:8px;"><button class="btn gold" id="chooseAtk" style="flex:1;">Atacar</button><button class="btn ghost" id="chooseDef" style="flex:1;">Defender</button></div>';
+  document.getElementById('chooseAtk').addEventListener('click', function(){ beginRound(winnerKey, otherKey(winnerKey)); });
+  document.getElementById('chooseDef').addEventListener('click', function(){ beginRound(otherKey(winnerKey), winnerKey); });
+}
+
+/* ---------- RONDA: economía (defensa primero, luego ofensiva) ---------- */
+function beginRound(offKey, defKey){
+  match.offensiveKey = offKey; match.defensiveKey = defKey;
+  match.econQueue = [offKey, defKey];
+  ['A','B'].forEach(function(k){ players[k].shieldNext = false; });
+  nextEcon();
+}
+function nextEcon(){
+  if (match.econQueue.length===0){ beginAttackChoice(); return; }
+  match.econKey = match.econQueue[0];
+  const p = players[match.econKey];
+  match.displayKey = match.econKey;
+
+  if (p.paralyzed){
+    p.paralyzed=false;
+    log(p.name+' está paralizado y pierde su fase de recuperación y movimiento.');
+    match.econQueue.shift();
+    setTimeout(nextEcon, 500);
+    return;
+  }
+  beginEcoCreatures();
+}
+
+function beginEcoCreatures(){
+  match.phase='ECO_CREATURES';
+  const key = match.econKey;
+  const mine = allCreatures.filter(function(c){ return c.ownerKey===key; });
+  refreshTop();
+  if (mine.length===0){ beginEcoEnergy(); return; }
+  renderCreatureActivation(mine, 0);
+}
+function renderCreatureActivation(list, idx){
+  if (idx>=list.length){ beginEcoEnergy(); return; }
+  const cr = list[idx];
+  const html =
+    '<div class="phase-title">Activar criatura: '+cr.name+' (N'+cr.level+')</div>'+
+    '<div class="phase-help">Se lanza un dado de '+(cr.dice||12)+' caras para ver su acción este turno.</div>'+
+    '<button class="btn gold" id="rollCreature" style="width:100%;">🎲 LANZAR</button>'+
+    '<div id="crResult" style="margin-top:10px; font-size:12px; color:var(--muted);"></div>';
+  el.phaseContent.innerHTML = html;
+  document.getElementById('rollCreature').addEventListener('click', function(){
+    playDiceSound();
+    const faces = cr.dice||12;
+    const roll = 1+randInt(faces);
+    const entry = cr.table.find(function(t){ return roll>=t.range[0] && roll<=t.range[1]; });
+    document.getElementById('crResult').innerHTML = 'Tirada: <b class="mono">'+roll+'</b> → '+(entry?entry.desc:'Sin efecto');
+    applyCreatureEffect(cr, entry);
+    setTimeout(function(){ renderCreatureActivation(list, idx+1); }, 900);
+  });
+}
+function applyCreatureEffect(cr, entry){
+  if (!entry) return;
+  const owner = players[cr.ownerKey], rival = players[otherKey(cr.ownerKey)];
+  function removeCr(){ allCreatures = allCreatures.filter(function(c){ return c!==cr; }); }
+  switch(entry.effect){
+    case 'dmg5': rival.vit=Math.max(0,rival.vit-5); log(cr.name+' inflige 5V a '+rival.name+'.'); checkDeathAndContinue(rival.key); break;
+    case 'dmg3': rival.vit=Math.max(0,rival.vit-3); log(cr.name+' inflige 3V a '+rival.name+'.'); checkDeathAndContinue(rival.key); break;
+    case 'dmg1': rival.vit=Math.max(0,rival.vit-1); log(cr.name+' inflige 1V a '+rival.name+'.'); checkDeathAndContinue(rival.key); break;
+    case 'dmg6': rival.vit=Math.max(0,rival.vit-6); log(cr.name+' inflige 6V a '+rival.name+'.'); checkDeathAndContinue(rival.key); break;
+    case 'dmgOwner2': owner.vit=Math.max(0,owner.vit-2); log(cr.name+' se revela y daña 2V a su propio invocador.'); checkDeathAndContinue(owner.key); break;
+    case 'dmgOwner1': owner.vit=Math.max(0,owner.vit-1); log(cr.name+' golpea 1V a su propio invocador.'); checkDeathAndContinue(owner.key); break;
+    case 'dmgBoth3': owner.vit=Math.max(0,owner.vit-3); rival.vit=Math.max(0,rival.vit-3); log(cr.name+' daña 3V a ambos jugadores.'); checkDeathAndContinue(owner.key); checkDeathAndContinue(rival.key); break;
+    case 'healVit3': owner.vit=Math.min(10,owner.vit+3); log(cr.name+' recupera +3 vital de '+owner.name+'.'); break;
+    case 'healPhys2': owner.phys=Math.min(10,owner.phys+2); log(cr.name+' recupera +2 E. física de '+owner.name+'.'); break;
+    case 'healVitFull': owner.vit=10; log(cr.name+' recupera la vida de '+owner.name+' a 10.'); break;
+    case 'healMagFull': owner.mag=10; log(cr.name+' recupera la magia de '+owner.name+' a 10.'); break;
+    case 'healMag10': owner.mag=10; log(cr.name+' recupera 10 de energía mágica de '+owner.name+'.'); break;
+    case 'healVit5Phys5': owner.vit=Math.min(10,owner.vit+5); owner.phys=Math.min(10,owner.phys+5); log(cr.name+' recupera +5 vital y +5 E. física de '+owner.name+'.'); break;
+    case 'drainPhys2': rival.phys=Math.max(0,rival.phys-2); log(cr.name+' resta 2 E. física a '+rival.name+'.'); break;
+    case 'drainMag1': rival.mag=Math.max(0,rival.mag-1); log(cr.name+' resta 1 E. mágica a '+rival.name+'.'); break;
+    case 'lockOpp': lockRandomTech(rival); log(cr.name+' anula una técnica al azar de '+rival.name+'.'); break;
+    case 'lockOwn': lockRandomTech(owner); log(cr.name+' anula una técnica al azar de '+owner.name+'.'); break;
+    case 'sleepOpp': rival.paralyzed=true; log(cr.name+' duerme a '+rival.name+' (pierde su próximo turno).'); break;
+    case 'sleepOwner': owner.paralyzed=true; log(cr.name+' duerme a '+owner.name+' (pierde su próximo turno).'); break;
+    case 'nullifyNext': owner.shieldNext=true; log(cr.name+' anulará el daño del próximo ataque que reciba '+owner.name+'.'); break;
+    case 'banish12': allCreatures = allCreatures.filter(function(c){ return !(c.ownerKey===rival.key && c.level<3); }); log(cr.name+' espanta las criaturas N1/N2 de '+rival.name+'.'); break;
+    case 'restoreVitals': log(cr.name+' intenta recuperar los estados vitales al turno anterior (efecto narrativo, sin snapshot detallado en esta versión).'); break;
+    case 'freeTech': log(cr.name+' permite a '+owner.name+' usar cualquier técnica este turno (elige normalmente en Fase de Ataque).'); break;
+    case 'sleep': log(cr.name+' no actúa este turno.'); break;
+    case 'leave': removeCr(); log(cr.name+' se va del campo.'); break;
+    default: break;
+  }
+  refreshTop();
+}
+function lockRandomTech(p){
+  if (!p.loadout || p.loadout.length===0) return;
+  const idx = randInt(p.loadout.length);
+  p.lockedTechs[idx] = 1;
+}
+
+function beginEcoEnergy(){
+  match.phase='ECO_ENERGY';
+  const key = match.econKey; const p = players[key];
+  match.energyTotal=0; match.energyPool=0;
+  refreshTop();
+  const html =
+    '<div class="phase-title">Fase de recuperación · '+p.name+'</div>'+
+    '<div class="phase-help">Lanza el dado de energías (0-5) y repártelo libremente entre tus barras (máx. 10 c/u). Lo no repartido se pierde.</div>'+
+    '<div class="dice-gem" id="enGem"><span id="enVal">–</span></div>'+
+    '<button class="btn gold" id="rollEnergy" style="width:100%; margin-top:10px;">🎲 LANZAR</button>'+
+    '<div id="enHelp" class="phase-help" style="margin-top:8px;"></div>'+
+    '<button class="btn" id="enContinue" style="width:100%; margin-top:6px;" disabled>Continuar</button>';
+  el.phaseContent.innerHTML = html;
+  document.getElementById('rollEnergy').addEventListener('click', function(){
+    playDiceSound();
+    this.disabled = true;
+    const gem = document.getElementById('enGem'); gem.classList.add('rolling');
+    let ticks=0;
+    const spin = setInterval(function(){
+      document.getElementById('enVal').textContent = randInt(6); ticks++;
+      if (ticks>8){
+        clearInterval(spin); gem.classList.remove('rolling');
+        const val = randInt(6);
+        document.getElementById('enVal').textContent = val;
+        match.energyTotal = val; match.energyPool = val;
+        document.getElementById('enHelp').textContent = 'Puntos disponibles: '+val+'. Usa los botones +/- en tus barras.';
+        document.getElementById('enContinue').disabled=false;
+        renderBars();
+      }
+    }, 55);
+  });
+  document.getElementById('enContinue').addEventListener('click', function(){
+    if (match.energyPool>0) log(p.name+' perdió '+match.energyPool+' punto(s) de energía sin repartir.');
+    beginEcoMovement(key);
+  });
+}
+function allocateEnergy(key, bar, d){
+  if (match.phase!=='ECO_ENERGY' || match.econKey!==key) return;
+  const p = players[key];
+  if (d>0){
+    if (match.energyPool<=0 || p[bar]>=10) return;
+    p[bar]++; match.energyPool--;
+  } else {
+    if (match.energyPool>=match.energyTotal) return;
+    p[bar]--; match.energyPool++;
+  }
+  const help = document.getElementById('enHelp');
+  if (help) help.textContent = 'Puntos disponibles: '+match.energyPool+'. Usa los botones +/- en tus barras.';
+  renderBars();
+}
+
+let movementKeyPending = null;
+function beginEcoMovement(key){
+  match.phase='ECO_MOVEMENT'; match.econKey = key; match.displayKey = key;
+  focusKey = key;
+  const p = players[key];
+  match.moveMax = p.maxMove; match.stepsRemaining=0; match.stepsTotal=0; match.trail=[];
+  refreshTop();
+  renderMovementPanel(false);
+}
+function renderMovementPanel(rolled){
+  const key = match.econKey; const p = players[key];
+  let html = '<div class="phase-title">Fase de movimiento · '+p.name+'</div>';
+  if (!rolled){
+    html += '<div class="phase-help">Rango de pasos según velocidad: 1 a '+match.moveMax+'.</div>'+
+      '<div class="dice-gem" id="mvGem"><span id="mvVal">–</span></div>'+
+      '<button class="btn gold" id="rollMove" style="width:100%; margin-top:10px;">🎲 LANZAR</button>';
+    el.phaseContent.innerHTML = html;
+    document.getElementById('rollMove').addEventListener('click', function(){
+      playDiceSound(); this.disabled=true;
+      const gem=document.getElementById('mvGem'); gem.classList.add('rolling');
+      let ticks=0;
+      const spin=setInterval(function(){
+        document.getElementById('mvVal').textContent = 1+randInt(match.moveMax); ticks++;
+        if (ticks>8){
+          clearInterval(spin); gem.classList.remove('rolling');
+          const val = 1+randInt(match.moveMax);
+          document.getElementById('mvVal').textContent = val;
+          match.stepsTotal=val; match.stepsRemaining=val;
+          log(p.name+' saca '+val+' paso(s) de movimiento.');
+          setTimeout(function(){ renderMovementPanel(true); }, 500);
+        }
+      }, 55);
+    });
+    return;
+  }
+  html += '<div class="phase-help">Pasos restantes: <b class="mono">'+match.stepsRemaining+'</b></div>'+
+    '<div class="dpad">'+
+      '<button class="dpad-btn up" id="mUp">▲</button>'+
+      '<button class="dpad-btn left" id="mLeft">◀</button>'+
+      '<div class="dpad-btn center">'+match.stepsRemaining+'</div>'+
+      '<button class="dpad-btn right" id="mRight">▶</button>'+
+      '<button class="dpad-btn down" id="mDown">▼</button>'+
+    '</div>'+
+    '<button class="btn gold" id="mvContinue" style="width:100%; margin-top:8px;">TERMINAR MOVIMIENTO</button>';
+  el.phaseContent.innerHTML = html;
+  ['mUp','mDown','mLeft','mRight'].forEach(function(id){
+    document.getElementById(id).disabled = match.stepsRemaining<=0;
+  });
+  document.getElementById('mUp').addEventListener('click', function(){ moveStep(0,-1); });
+  document.getElementById('mDown').addEventListener('click', function(){ moveStep(0,1); });
+  document.getElementById('mLeft').addEventListener('click', function(){ moveStep(-1,0); });
+  document.getElementById('mRight').addEventListener('click', function(){ moveStep(1,0); });
+  document.getElementById('mvContinue').addEventListener('click', function(){
+    reflowCreatures(key);
+    match.econQueue.shift();
+    nextEcon();
+  });
+}
+function moveStep(dcol,drow){
+  if (match.stepsRemaining<=0) return;
+  const key = match.econKey; const p = players[key];
+  const nc = clamp(p.col+dcol,0,MAP_SIZE-1), nr = clamp(p.row+drow,0,MAP_SIZE-1);
+  if (nc===p.col && nr===p.row) return;
+  const occByOther = (players[otherKey(key)].col===nc && players[otherKey(key)].row===nr);
+  // las criaturas solo bloquean al rival y a las criaturas del rival; las propias se reubican
+  const occByRivalCreature = allCreatures.some(function(c){ return c.col===nc && c.row===nr && c.ownerKey!==key; });
+  if (occByOther || occByRivalCreature) return; // casilla ocupada por el rival
+  p.col=nc; p.row=nr; match.stepsRemaining--;
+  reflowCreatures(key); // las criaturas propias se apartan para dejar pasar a su dueño
+  refreshTop();
+  renderMovementPanel(true);
+}
+
+/* ---------- FASE DE ATAQUE ---------- */
+function techAvailable(p, id){
+  if (!p.loadout || p.loadout.indexOf(id)<0) return false;
+  const idx = p.loadout.indexOf(id);
+  return !p.lockedTechs[idx];
+}
+function techCostOk(p, t){
+  if (t.variable) return (t.res==='phys'?p.phys:p.mag) > 0;
+  const cost = t.costPerHit!=null ? t.costPerHit : (t.cost||0);
+  return (t.res==='phys'?p.phys:p.mag) >= cost;
+}
+function techRangeOk(t, d){
+  if (!t.range) return true;
+  return d>=t.range[0] && d<=t.range[1];
+}
+
+function beginAttackChoice(){
+  match.phase='ATTACK_CHOICE';
+  const atk = players[match.offensiveKey], def = players[match.defensiveKey];
+  match.displayKey = match.offensiveKey;
+  focusKey = match.offensiveKey;
+  refreshTop();
+  const d = dist(atk,def);
+  let html = '<div class="phase-title">Fase de ataque · '+atk.name+'</div>'+
+    '<div class="phase-help">Distancia al rival: '+d+' cuadros.</div>';
+  atk.loadout.forEach(function(id, idx){
+    const t = TECH[id];
+    const locked = !!atk.lockedTechs[idx];
+    const inRange = techRangeOk(t, d);
+    const afford = techCostOk(atk, t);
+    const ok = inRange && afford && !locked;
+    let meta = 'Rango '+(t.range?t.range.join('-'):'—');
+    if (locked) meta += ' · ANULADA este turno';
+    else if (!inRange) meta += ' · fuera de rango';
+    else if (!afford) meta += ' · energía insuficiente';
+    html += '<div class="opt-row'+(ok?'':' disabled')+'" data-idx="'+idx+'"><span class="n">'+t.name+'</span><span class="m">'+meta+'</span></div>';
+  });
+  html += '<button class="btn ghost" id="noAttackBtn" style="width:100%; margin-top:8px;">NO ATACAR</button>';
+  el.phaseContent.innerHTML = html;
+  el.phaseContent.querySelectorAll('.opt-row:not(.disabled)').forEach(function(row){
+    row.addEventListener('click', function(){
+      const idx = +this.getAttribute('data-idx');
+      startTechniqueFlow(atk, def, atk.loadout[idx], 'attack');
+    });
+  });
+  document.getElementById('noAttackBtn').addEventListener('click', function(){
+    log(atk.name+' decide no atacar este turno.');
+    setTimeout(startGeneralRoll, 400);
+  });
+}
+
+function startTechniqueFlow(actor, target, techId, role){
+  const t = TECH[techId];
+  if (t.effect==='telekinesis'){ configureTelekinesis(actor, target, techId, role); return; }
+  if (t.effect==='imitacion'){ configureImitacion(actor, target, role); return; }
+  if (t.effect==='telepatico'){ configureTelepatico(actor, target, role); return; }
+  if (t.effect==='invocar_oscura' || t.effect==='invocar_divina'){ configureInvocacion(actor, techId, role); return; }
+  finalizeAttackSelection(actor, target, techId, {}, role);
+}
+
+function configureTelekinesis(actor, target, techId, role){
+  const table = [[9,1],[8,2],[7,3],[6,4],[5,5],[4,6],[3,7],[2,8],[1,9]];
+  const maxMag = actor.mag;
+  const options = table.filter(function(r){ return r[0]<=maxMag; });
+  let html = '<h3>Telekinesis</h3><p>Elige la combinación daño/distancia (costo = daño en energía mágica).</p>';
+  options.forEach(function(r,i){ html += '<div class="opt-row" data-i="'+i+'"><span class="n">Daño '+r[0]+'V</span><span class="m">Distancia máx '+r[1]+' · costo '+r[0]+'</span></div>'; });
+  html += '<div class="modal-footer"><button class="btn ghost" id="tkCancel">Cancelar</button></div>';
+  const card = showModal(html);
+  card.querySelectorAll('.opt-row').forEach(function(row){
+    row.addEventListener('click', function(){
+      const r = options[+this.getAttribute('data-i')];
+      const d = dist(actor,target);
+      if (d>r[1]){ alert('El rival está fuera del alcance para ese daño (distancia '+d+').'); return; }
+      closeModal();
+      finalizeAttackSelection(actor, target, techId, {dmg:r[0], cost:r[0], spd:8, prec:75}, role);
+    });
+  });
+  card.querySelector('#tkCancel').addEventListener('click', closeModal);
+}
+
+function configureImitacion(actor, target, role){
+  let html = '<h3>Imitación</h3><p>Elige la técnica del rival que usarás este turno (pagando su costo normal).</p>';
+  target.loadout.forEach(function(id, idx){
+    const t = TECH[id];
+    if (t.cat==='especial' && (t.effect==='imitacion')) return;
+    html += '<div class="opt-row" data-id="'+id+'"><span class="n">'+t.name+'</span><span class="m">'+(t.cost!=null?('costo '+t.cost):'costo variable')+'</span></div>';
+  });
+  html += '<div class="modal-footer"><button class="btn ghost" id="imCancel">Cancelar</button></div>';
+  const card = showModal(html);
+  card.querySelectorAll('.opt-row').forEach(function(row){
+    row.addEventListener('click', function(){
+      const id = this.getAttribute('data-id');
+      closeModal();
+      if (actor.mag<2){ alert('No hay energía mágica suficiente para Imitación (costo 2).'); return; }
+      actor.mag -= 2;
+      startTechniqueFlow(actor, target, id, role); // ejecuta la técnica copiada (pagará su propio costo también)
+    });
+  });
+  card.querySelector('#imCancel').addEventListener('click', closeModal);
+}
+
+function configureTelepatico(actor, target, role){
+  const maxLocks = Math.min(target.loadout.length, Math.floor(actor.mag/2));
+  let html = '<h3>Control Telepático</h3><p>Elige cuántas técnicas del rival anular (2 energía mágica c/u). Se anulan en su próximo turno.</p>'+
+    '<div class="modal-extra"><span style="width:70px;">Cantidad</span><input type="range" id="tpN" min="0" max="'+maxLocks+'" value="'+Math.min(1,maxLocks)+'"><span id="tpNVal" class="mono">'+Math.min(1,maxLocks)+'</span></div>'+
+    '<div class="modal-footer"><button class="btn ghost" id="tpCancel">Cancelar</button><button class="btn gold" id="tpConfirm">Confirmar</button></div>';
+  const card = showModal(html);
+  card.querySelector('#tpN').addEventListener('input', function(){ card.querySelector('#tpNVal').textContent=this.value; });
+  card.querySelector('#tpCancel').addEventListener('click', closeModal);
+  card.querySelector('#tpConfirm').addEventListener('click', function(){
+    const n = +card.querySelector('#tpN').value;
+    closeModal();
+    actor.mag -= n*2;
+    const idxs = target.loadout.map(function(_,i){return i;});
+    for (let i=0;i<n;i++){
+      const pick = idxs.splice(randInt(idxs.length),1)[0];
+      target.lockedTechs[pick] = 2; // se activa su próximo turno
+    }
+    log(actor.name+' usa Control Telepático y anula '+n+' técnica(s) de '+target.name+' para su próximo turno.');
+    afterActionNoDefenseNeeded();
+  });
+}
+
+function configureInvocacion(actor, techId, role){
+  const kind = techId==='oscura'?'oscura':'divina';
+  const maxLvl = clamp(actor.mag,0,3);
+  let html = '<h3>'+(kind==='oscura'?'Invocación Oscura':'Invocación Divina')+'</h3><p>Elige el nivel a invocar (costo = nivel en energía mágica).</p>';
+  for (let lvl=1; lvl<=3; lvl++){
+    const already3 = lvl===3 && allCreatures.some(function(c){ return c.ownerKey===actor.key && c.level===3; });
+    const ok = lvl<=maxLvl && !already3;
+    html += '<div class="opt-row'+(ok?'':' disabled')+'" data-lvl="'+lvl+'"><span class="n">Nivel '+lvl+'</span><span class="m">'+(already3?'ya tienes un N3 activo':'costo '+lvl)+'</span></div>';
+  }
+  html += '<div class="modal-footer"><button class="btn ghost" id="invCancel">Cancelar</button></div>';
+  const card = showModal(html);
+  card.querySelectorAll('.opt-row:not(.disabled)').forEach(function(row){
+    row.addEventListener('click', function(){
+      const lvl = +this.getAttribute('data-lvl');
+      closeModal();
+      actor.mag -= lvl;
+      const pool = CREATURES[kind][lvl];
+      const template = randChoice(pool);
+      const cr = { ownerKey:actor.key, kind:kind, level:lvl, name:template.name, life:template.life, maxLife:template.life, table:template.table, dice:template.dice||12, col:actor.col, row:actor.row };
+      allCreatures.push(cr);
+      reflowCreatures(actor.key);
+      log(actor.name+' invoca a '+cr.name+' (N'+lvl+', '+cr.life+' vital).');
+      afterActionNoDefenseNeeded();
+    });
+  });
+  card.querySelector('#invCancel').addEventListener('click', closeModal);
+}
+
+function afterActionNoDefenseNeeded(){
+  // acciones que no requieren contestación del rival (invocar, telepático): terminan el turno y van a lanzamiento general
+  refreshTop();
+  setTimeout(startGeneralRoll, 700);
+}
+
+/* ---------- FASE DE ESPERA / RESPUESTA ---------- */
+function finalizeAttackSelection(actor, target, techId, overrides, role){
+  const t = Object.assign({}, TECH[techId], overrides);
+  if (!overrides.cost){
+    const cost = t.costPerHit!=null ? t.costPerHit : (t.cost||0);
+    if ((t.res==='phys'?actor.phys:actor.mag) < cost){ alert('Energía insuficiente.'); return; }
+  } else {
+    if ((t.res==='phys'?actor.phys:actor.mag) < overrides.cost){ alert('Energía insuficiente.'); return; }
+  }
+  match.pendingAttack = { attackerKey:actor.key, techId:techId, t:t };
+  beginDefenseChoice();
+}
+
+function beginDefenseChoice(){
+  match.phase='DEFENSE_CHOICE';
+  const atk = players[match.pendingAttack.attackerKey];
+  const def = players[otherKey(atk.key)];
+  match.displayKey = def.key;
+  refreshTop();
+  const t = match.pendingAttack.t;
+  const d = dist(atk,def);
+
+  let html = '<div class="phase-title">Fase de espera · '+def.name+'</div>'+
+    '<div class="phase-help">'+atk.name+' usa <b>'+t.name+'</b>. Responde atacando o defendiendo. Si no puedes pagar nada, recibirás el golpe.</div>';
+
+  let anyOption = false;
+  html += '<div style="font-size:10.5px; color:var(--gold); margin:6px 0 4px;">Contraatacar</div>';
+  def.loadout.forEach(function(id, idx){
+    const tt = TECH[id];
+    const locked = !!def.lockedTechs[idx];
+    const inRange = techRangeOk(tt, d);
+    const afford = techCostOk(def, tt);
+    const ok = inRange && afford && !locked;
+    if (ok) anyOption = true;
+    html += '<div class="opt-row'+(ok?'':' disabled')+'" data-mode="attack" data-id="'+id+'"><span class="n">'+tt.name+'</span><span class="m">'+(locked?'anulada':(!inRange?'fuera de rango':(!afford?'sin energía':'')))+'</span></div>';
+  });
+  html += '<div style="font-size:10.5px; color:var(--gold); margin:10px 0 4px;">Defender</div>';
+  def.defenses.forEach(function(id){
+    const dd = DEF[id];
+    let cost = dd.cost || 1;
+    const afford = dd.kind==='block' ? def.phys>=1 : (dd.res==='phys'?def.phys:def.mag)>=cost;
+    if (afford) anyOption = true;
+    html += '<div class="opt-row'+(afford?'':' disabled')+'" data-mode="defend" data-id="'+id+'"><span class="n">'+dd.name+'</span><span class="m">'+(dd.kind==='block'?'bloquea 1-5 (consume igual E. física)':('costo '+cost))+'</span></div>';
+  });
+  html += '<div style="font-size:10.5px; color:var(--muted); margin:10px 0 4px;">Sin energía para responder</div>'+
+    '<div class="opt-row" data-mode="none"><span class="n">Recibir el golpe</span><span class="m">sin respuesta</span></div>';
+
+  el.phaseContent.innerHTML = html;
+  el.phaseContent.querySelectorAll('.opt-row:not(.disabled)').forEach(function(row){
+    row.addEventListener('click', function(){
+      const mode = this.getAttribute('data-mode');
+      if (mode==='attack'){
+        const id = this.getAttribute('data-id');
+        match.pendingResponse = { defenderKey:def.key, mode:'attack', techId:id };
+        resolveCombat();
+      } else if (mode==='defend'){
+        const id = this.getAttribute('data-id');
+        const dd = DEF[id];
+        if (dd.kind==='block'){
+          promptBlockAmount(def, id);
+        } else {
+          match.pendingResponse = { defenderKey:def.key, mode:'defend', defId:id };
+          resolveCombat();
+        }
+      } else {
+        match.pendingResponse = { defenderKey:def.key, mode:'none' };
+        resolveCombat();
+      }
+    });
+  });
+}
+function promptBlockAmount(def, id){
+  const maxB = Math.min(5, def.phys);
+  const card = showModal(
+    '<h3>Defender</h3><p>Elige cuánto daño bloquear (consume esa misma energía física).</p>'+
+    '<div class="modal-extra"><span style="width:60px;">Bloquear</span><input type="range" id="bAmt" min="1" max="'+maxB+'" value="1"><span id="bAmtVal" class="mono">1</span></div>'+
+    '<div class="modal-footer"><button class="btn ghost" id="bCancel">Cancelar</button><button class="btn gold" id="bConfirm">Confirmar</button></div>'
+  );
+  card.querySelector('#bAmt').addEventListener('input', function(){ card.querySelector('#bAmtVal').textContent=this.value; });
+  card.querySelector('#bCancel').addEventListener('click', closeModal);
+  card.querySelector('#bConfirm').addEventListener('click', function(){
+    const amt = +card.querySelector('#bAmt').value;
+    closeModal();
+    match.pendingResponse = { defenderKey:def.key, mode:'defend', defId:id, amount:amt };
+    resolveCombat();
+  });
+}
+
+/* ---------- RESOLUCIÓN ---------- */
+function effectiveSpeed(p, t, slotDirection){
+  let spd = t.spd!=null ? t.spd : 5;
+  return spd;
+}
+function effectivePrecision(p, t){
+  let prec = t.prec!=null ? t.prec : 50;
+  const attr = t.res==='phys' ? p.attrPhys.destreza : p.attrMagic.precision;
+  prec += attr*10;
+  return clamp(prec,0,100);
+}
+function rollPrecisionDie(){ return randInt(10)*10; }
+
+function payCost(p, t){
+  const cost = t.cost!=null ? t.cost : (t.costPerHit||0);
+  if (t.res==='phys') p.phys=Math.max(0,p.phys-cost); else p.mag=Math.max(0,p.mag-cost);
+}
+
+function applyDamage(attacker, defender, t, defResp){
+  let dmg = t.dmg!=null ? t.dmg : 0;
+  if (t.effect!=='telekinesis'){
+    const powerAttr = t.res==='phys' ? attacker.attrPhys.fuerza : attacker.attrMagic.poder;
+    dmg += powerAttr;
+  }
+  dmg = Math.max(0,dmg);
+
+  if (defender.shieldNext){ defender.shieldNext=false; log('El escudo de Ángel Protector anula el daño por completo.'); return 0; }
+
+  if (defResp && defResp.mode==='defend'){
+    const dd = DEF[defResp.defId];
+    if (dd.kind==='block'){
+      defender.phys = Math.max(0, defender.phys - defResp.amount);
+      dmg = Math.max(0, dmg-defResp.amount);
+    } else if (dd.kind==='elemental'){
+      if (t.element){
+        const rel = elementBeats(dd.element, t.element);
+        if (rel>0){ defender.mag=Math.max(0,defender.mag-1); dmg=0; }
+        else if (rel<0){ defender.mag=Math.max(0,defender.mag-1); /* castigo, escudo debilitado, sin reducción */ }
+        else { const c=Math.min(5,defender.mag); defender.mag=Math.max(0,defender.mag-c); dmg=Math.max(0,dmg-c); }
+      } else {
+        // los escudos elementales no protegen ataques físicos
+      }
+    } else if (dd.kind==='sagrado'){
+      if (t.cat==='especial'){ defender.mag=Math.max(0,defender.mag-3); dmg=0; }
+    } else if (dd.kind==='evade'){
+      defender.phys = Math.max(0, defender.phys-1);
+      // el efecto de evasión ya se aplicó a la precisión antes de tirar
+    }
+  }
+  defender.vit = Math.max(0, defender.vit-dmg);
+  return dmg;
+}
+
+function resolveCombat(){
+  match.phase='RESOLVE';
+  const atkKey = match.pendingAttack.attackerKey;
+  const defKey = otherKey(atkKey);
+  const atk = players[atkKey], def = players[defKey];
+  const t = match.pendingAttack.t;
+  const resp = match.pendingResponse;
+
+  // pagar costo del atacante
+  payCost(atk, t);
+  if (t.direction) atk.lastDirection = t.direction;
+
+  if (resp.mode==='none'){
+    resolveSinglePrecisionRoll(atk, def, t, null, function(hit, dmg){
+      finishRoundAfterSingle(atkKey, hit);
+    });
+    return;
+  }
+
+  if (resp.mode==='defend'){
+    const dd = DEF[resp.defId];
+    if (dd.kind==='block' || dd.kind==='sagrado'){
+      if (dd.kind==='sagrado') def.mag=Math.max(0,def.mag-3);
+    }
+    resolveSinglePrecisionRoll(atk, def, t, resp, function(hit, dmg){
+      log(atk.name+' usa '+t.name+' contra la defensa de '+def.name+' ('+DEF[resp.defId].name+').');
+      // paga costo de evadir si corresponde (ya se descuenta en applyDamage para block/evade); para elemental/sagrado ya se maneja
+      // siempre pasa a lanzamiento general
+      setTimeout(startGeneralRoll, 900);
+    });
+    return;
+  }
+
+  // resp.mode === 'attack' -> contestación real: comparar velocidades
+  const counterId = resp.techId;
+  const counterT = TECH[counterId];
+  const d = dist(atk,def);
+  if (!techRangeOk(counterT, d) || !techCostOk(def, counterT)){
+    // no debería pasar (ya filtrado), fallback a defensa nula
+    resolveSinglePrecisionRoll(atk, def, t, null, function(hit){ finishRoundAfterSingle(atkKey, hit); });
+    return;
+  }
+
+  const spdA = effectiveSpeed(atk, t);
+  const spdD = effectiveSpeed(def, counterT);
+
+  if (spdA===spdD){
+    // empate de velocidad: ambos atacan
+    payCost(def, counterT);
+    const rollA = rollPrecisionDie(), precA = effectivePrecision(atk,t);
+    const hitA = rollA < precA;
+    let dmgA=0;
+    if (hitA) dmgA = applyDamage(atk, def, t, null);
+    log(atk.name+' (ofensiva) usa '+t.name+': '+(hitA?('acierta, '+dmgA+' de daño'):'falla')+'.');
+    const rollD = rollPrecisionDie(), precD = effectivePrecision(def,counterT);
+    const hitD = rollD < precD;
+    let dmgD=0;
+    if (hitD && def.vit>0) dmgD = applyDamage(def, atk, counterT, null);
+    log(def.name+' (defensa) usa '+counterT.name+': '+(hitD?('acierta, '+dmgD+' de daño'):'falla')+'.');
+    if (checkDeathAndContinue(defKey) || checkDeathAndContinue(atkKey)) return;
+    if ((hitA && hitD) || (!hitA && !hitD)){
+      setTimeout(startGeneralRoll, 900);
+    } else {
+      const winnerKey = hitA ? atkKey : defKey;
+      setTimeout(function(){ beginRound(winnerKey, otherKey(winnerKey)); }, 900);
+    }
+    return;
+  }
+
+  const faster = spdA>spdD ? {key:atkKey,p:atk,t:t,isAtk:true} : {key:defKey,p:def,t:counterT,isAtk:false};
+  const slower = spdA>spdD ? {key:defKey,p:def,t:counterT,isAtk:false} : {key:atkKey,p:atk,t:t,isAtk:true};
+
+  const roll1 = rollPrecisionDie(); const prec1 = effectivePrecision(faster.p, faster.t);
+  const hit1 = roll1 < prec1;
+  if (hit1){
+    if (!faster.isAtk) payCost(def, counterT);
+    const targetP = faster.isAtk ? def : atk;
+    const dmg = applyDamage(faster.p, targetP, faster.t, faster.isAtk?resp:null);
+    log(players[faster.key].name+' es más rápido, acierta con '+faster.t.name+' e inflige '+dmg+' de daño.');
+    if (checkDeathAndContinue(targetP.key)) return;
+    setTimeout(function(){ beginRound(faster.key, otherKey(faster.key)); }, 900);
+    return;
+  } else {
+    log(players[faster.key].name+' es más rápido pero falla su ataque.');
+    if (!slower.isAtk){
+      // el más lento eligió defender, no atacar: paga costo igualmente, pasa a lanzamiento general
+      setTimeout(startGeneralRoll, 900);
+      return;
+    }
+    if (!slower.isAtk===false){ /* slower is attacking */ }
+    payCost(players[slower.key], slower.t);
+    const roll2 = rollPrecisionDie(); const prec2 = effectivePrecision(slower.p, slower.t);
+    const hit2 = roll2 < prec2;
+    const targetP2 = slower.isAtk ? def : atk;
+    if (hit2){
+      const dmg2 = applyDamage(slower.p, targetP2==def?def:atk, slower.t, null);
+      log(players[slower.key].name+' aprovecha y acierta con '+slower.t.name+', '+dmg2+' de daño.');
+      if (checkDeathAndContinue((slower.isAtk?def:atk).key)) return;
+      setTimeout(function(){ beginRound(slower.key, otherKey(slower.key)); }, 900);
+    } else {
+      log(players[slower.key].name+' también falla.');
+      setTimeout(startGeneralRoll, 900);
+    }
+  }
+}
+
+function resolveSinglePrecisionRoll(atk, def, t, resp, cb){
+  const roll = rollPrecisionDie();
+  let prec = effectivePrecision(atk,t);
+  if (resp && resp.mode==='defend' && DEF[resp.defId].kind==='evade'){
+    prec -= def.maxMove*10; prec = clamp(prec,0,100);
+  }
+  const hit = roll<prec;
+  let dmg=0;
+  if (hit) dmg = applyDamage(atk, def, t, resp);
+  log(atk.name+' usa '+t.name+': '+(hit?('acierta ('+roll+'<'+prec+'%), '+dmg+' de daño'):('falla ('+roll+'≥'+prec+'%)'))+'.');
+  if (checkDeathAndContinue(def.key)){ return; }
+  cb(hit, dmg);
+}
+function finishRoundAfterSingle(atkKey, hit){
+  if (hit){ setTimeout(function(){ beginRound(atkKey, otherKey(atkKey)); }, 900); }
+  else { setTimeout(startGeneralRoll, 900); }
+}
+
+/* ---------- MUERTE / FIN ---------- */
+function checkDeathAndContinue(key){
+  const p = players[key];
+  if (p.vit<=0){
+    const winnerKey = otherKey(key);
+    setTimeout(function(){ endMatch(winnerKey, key); }, 300);
+    return true;
+  }
+  return false;
+}
+function endMatch(winnerKey, loserKey){
+  const winner=players[winnerKey], loser=players[loserKey];
+  if (winnerKey==='A') winsA++; else winsB++;
+  const card = showModal(
+    '<h3 style="text-align:center;">¡Combate terminado!</h3>'+
+    '<div class="endgame"><p><b>'+loser.name+'</b> ha caído.<br><b style="color:'+winner.color+'">'+winner.name+'</b> gana la partida.</p>'+
+    '<p class="mono" style="font-size:12px; color:var(--muted);">Victorias A: '+winsA+' · Victorias B: '+winsB+'</p></div>'+
+    '<div class="modal-footer" style="justify-content:center;"><button class="btn gold" id="playAgain">Crear nuevos personajes</button></div>'
+  );
+  card.querySelector('#playAgain').addEventListener('click', function(){ closeModal(); resetSetupScreen(); });
+}
+
+requestAnimationFrame(drawLoop);
+
+})();
+</script>
+</body>
+</html>
 
