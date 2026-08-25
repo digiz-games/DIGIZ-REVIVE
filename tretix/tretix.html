@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TRETIX — DIGIZ GAMES CHILE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --neon-cyan:#0ff0fc;
+    --neon-mag:#ff2fd0;
+    --neon-yel:#f6ff2f;
+    --neon-grn:#2fff8f;
+    --neon-purp:#a52fff;
+    --bg-flat:#111318;
+    --bg-neon:#04020a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000; font-family:'Share Tech Mono', monospace; touch-action:none;}
+  #app{position:fixed; inset:0; background:var(--bg-flat); transition:background 3s ease;}
+  #app.neon{background:var(--bg-neon);}
+  canvas{display:block; width:100%; height:100%; transition:filter 3s ease;}
+  canvas.neon-glow{filter:drop-shadow(0 0 6px rgba(0,255,252,.55)) drop-shadow(0 0 16px rgba(255,47,208,.35)) saturate(1.3);}
+
+  #scanlines{
+    position:fixed; inset:0; pointer-events:none; z-index:5;
+    background:repeating-linear-gradient(rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,.12) 3px, rgba(0,0,0,0) 4px);
+    opacity:.5;
+    mix-blend-mode:overlay;
+  }
+  #vignette{position:fixed; inset:0; pointer-events:none; z-index:4;
+    box-shadow: inset 0 0 18vw 2vw rgba(0,0,0,.65);
+  }
+
+  /* ---- HUD ---- */
+  #hud{position:fixed; top:0; left:0; right:0; z-index:10; padding:10px 14px; display:flex; justify-content:space-between; align-items:flex-start; pointer-events:none; font-family:'Orbitron',sans-serif;}
+  .hudBox{background:rgba(10,8,20,.55); border:2px solid var(--neon-cyan); border-radius:8px; padding:6px 12px; color:var(--neon-cyan); text-shadow:0 0 6px var(--neon-cyan); box-shadow:0 0 10px rgba(0,255,252,.35); backdrop-filter:blur(2px);}
+  .hudBox.mag{border-color:var(--neon-mag); color:var(--neon-mag); text-shadow:0 0 6px var(--neon-mag); box-shadow:0 0 10px rgba(255,47,208,.35);}
+  .hudBox .lbl{font-size:9px; opacity:.75; letter-spacing:2px;}
+  .hudBox .val{font-size:20px; font-weight:900; letter-spacing:2px;}
+  #title{position:absolute; left:50%; top:6px; transform:translateX(-50%); text-align:center; font-family:'Orbitron',sans-serif; font-weight:900; font-size:22px; letter-spacing:6px; color:#fff; text-shadow:0 0 8px var(--neon-cyan),0 0 18px var(--neon-mag); pointer-events:none;}
+  #title small{display:block; font-size:8px; letter-spacing:3px; color:var(--neon-yel); text-shadow:0 0 6px var(--neon-yel); font-family:'Share Tech Mono',monospace;}
+
+  /* ---- camera view buttons ---- */
+  #camPad{position:fixed; right:10px; top:96px; z-index:10; display:grid; grid-template-columns:repeat(3,34px); gap:4px;}
+  #camPad button{width:34px; height:34px; background:rgba(10,8,20,.6); border:1px solid var(--neon-mag); color:var(--neon-mag); font-family:'Orbitron',sans-serif; font-size:9px; border-radius:6px; text-shadow:0 0 4px var(--neon-mag);}
+  #camPad button:active{background:rgba(255,47,208,.3);}
+
+  /* ---- movement dpad ---- */
+  #movePad{position:fixed; left:10px; bottom:16px; z-index:10; display:grid; grid-template-columns:repeat(3,46px); grid-template-rows:repeat(3,46px); gap:4px;}
+  #movePad button{background:rgba(10,8,20,.6); border:1px solid var(--neon-cyan); color:var(--neon-cyan); border-radius:8px; font-size:18px; text-shadow:0 0 5px var(--neon-cyan);}
+  #movePad button:active{background:rgba(0,255,252,.3);}
+  #rotBtn{position:fixed; right:10px; bottom:16px; z-index:10; width:64px; height:64px; border-radius:50%; background:rgba(10,8,20,.65); border:2px solid var(--neon-yel); color:var(--neon-yel); font-family:'Orbitron',sans-serif; font-size:10px; text-shadow:0 0 6px var(--neon-yel); box-shadow:0 0 14px rgba(246,255,47,.4);}
+  #dropBtn{position:fixed; right:82px; bottom:24px; z-index:10; width:52px; height:52px; border-radius:50%; background:rgba(10,8,20,.65); border:2px solid var(--neon-grn); color:var(--neon-grn); font-family:'Orbitron',sans-serif; font-size:9px; text-shadow:0 0 6px var(--neon-grn);}
+  #muteBtn{position:fixed; left:10px; top:96px; z-index:10; width:34px; height:34px; background:rgba(10,8,20,.6); border:1px solid var(--neon-grn); color:var(--neon-grn); border-radius:6px; font-size:14px;}
+
+  #hint{position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:9; color:rgba(255,255,255,.55); font-size:10px; letter-spacing:1px; text-align:center; pointer-events:none; width:90%;}
+
+  /* ---- overlays ---- */
+  .overlay{position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:radial-gradient(ellipse at center, rgba(20,5,35,.92), rgba(0,0,0,.97)); gap:14px; padding:20px;}
+  .hidden{display:none !important;}
+  .bigTitle{font-family:'Orbitron',sans-serif; font-weight:900; font-size:44px; letter-spacing:8px; color:#fff; text-shadow:0 0 10px var(--neon-cyan),0 0 26px var(--neon-mag),0 0 40px var(--neon-mag); animation:pulseGlow 1.6s ease-in-out infinite;}
+  @keyframes pulseGlow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.4)}}
+  .subTitle{font-family:'Share Tech Mono',monospace; color:var(--neon-yel); letter-spacing:3px; font-size:13px; text-shadow:0 0 6px var(--neon-yel);}
+  .btn{font-family:'Orbitron',sans-serif; font-weight:700; letter-spacing:2px; background:linear-gradient(180deg, rgba(0,255,252,.18), rgba(255,47,208,.18)); color:#fff; border:2px solid var(--neon-cyan); padding:14px 30px; border-radius:10px; font-size:14px; box-shadow:0 0 16px rgba(0,255,252,.4); cursor:pointer;}
+  .btn:active{transform:scale(.96);}
+  .infoTxt{color:rgba(255,255,255,.7); font-size:11px; max-width:340px; line-height:1.6; letter-spacing:.5px;}
+  .infoTxt b{color:var(--neon-cyan);}
+  #digizTag{font-family:'Orbitron',sans-serif; font-size:12px; letter-spacing:4px; color:var(--neon-mag); text-shadow:0 0 8px var(--neon-mag);}
+
+  #particles{position:fixed; inset:0; z-index:49; pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c"></canvas>
+</div>
+<div id="scanlines"></div>
+<div id="vignette"></div>
+<canvas id="particles"></canvas>
+
+<div id="hud">
+  <div class="hudBox">
+    <div class="lbl">SCORE</div>
+    <div class="val" id="scoreVal">000000</div>
+  </div>
+  <div id="title">TRETIX<small>DIGIZ GAMES CHILE</small></div>
+  <div class="hudBox mag">
+    <div class="lbl">LEVEL</div>
+    <div class="val" id="levelVal">01</div>
+  </div>
+</div>
+<div class="hudBox" style="position:fixed; top:56px; left:14px; z-index:10;">
+  <div class="lbl">PISOS</div>
+  <div class="val" id="linesVal" style="font-size:16px;">0</div>
+</div>
+
+<button id="muteBtn">♪</button>
+<div id="camPad">
+  <div></div><button data-v="top">TOP</button><div></div>
+  <button data-v="left">◀</button><button data-v="front">FRT</button><button data-v="right">▶</button>
+  <div></div><button data-v="back">BCK</button><div></div>
+</div>
+
+<div id="hint">Arrastra la pantalla: girar cámara · Toca la pieza: rotarla · Flechas/D-Pad: mover</div>
+
+<div id="movePad">
+  <div></div><button data-m="fz">▲</button><div></div>
+  <button data-m="nx">◀</button><div></div><button data-m="px">▶</button>
+  <div></div><button data-m="bz">▼</button><div></div>
+</div>
+<button id="dropBtn">DROP</button>
+<button id="rotBtn">ROTAR</button>
+
+<!-- START -->
+<div class="overlay" id="startScreen">
+  <div class="bigTitle">TRETIX</div>
+  <div id="digizTag">— DIGIZ GAMES CHILE —</div>
+  <div class="infoTxt">
+    Tetris 3D. Las piezas caen dentro de un cubo. <b>Toca / clickea la pieza</b> para rotarla en todas sus posturas posibles.
+    <b>Arrastra la pantalla</b> para girar la cámara y ver el cubo en X, Z y desde arriba.
+    Debes <b>completar pisos horizontales completos</b> (no solo una cara) para destruirlos. Sube del nivel 1 al 99.
+  </div>
+  <button class="btn" id="startBtn">▶ INICIAR JUEGO</button>
+</div>
+
+<!-- GAME OVER -->
+<div class="overlay hidden" id="overScreen">
+  <div class="bigTitle" style="color:#ff3b3b; text-shadow:0 0 10px #ff3b3b,0 0 26px #ff0000;">GAME OVER</div>
+  <div class="subTitle" id="overScore">SCORE: 0</div>
+  <button class="btn" id="retryBtn">↻ REINTENTAR</button>
+</div>
+
+<!-- WIN -->
+<div class="overlay hidden" id="winScreen">
+  <div class="bigTitle">YOU WIN</div>
+  <div id="digizTag" style="font-size:16px;">DIGIZ GAMES CHILE</div>
+  <div class="subTitle" id="winScore">SCORE FINAL: 0</div>
+  <button class="btn" id="againBtn">↻ JUGAR OTRA VEZ</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============================== CONFIG ============================== */
+const GX=5, GZ=5, GY=15;         // ancho, profundidad, alto del pozo
+const CELL=1.0;
+const COLORS = {
+  cubo:0x0ff0fc, linea:0xf6ff2f, ele:0x2fff8f, zeta:0xff2fd0, te:0xa52fff, cruz:0xff8a2f, tri:0x2f7bff
+};
+let level=1, score=0, layersCleared=0, elapsed=0;
+let gameRunning=false, gameOverFlag=false, winFlag=false;
+let transitionT=0; // 0 flat 2D arcade -> 1 full neon
+let neonTriggered=false;
+
+/* ============================== SHAPES (fusion 3D tetromino-like) ============================== */
+const SHAPES = {
+  cubo:  [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]],           // cubo 2x2x2
+  linea: [[0,0,0],[1,0,0],[2,0,0],[3,0,0]],                                            // linea recta
+  ele:   [[0,0,0],[1,0,0],[2,0,0],[2,1,0],[2,1,1]],                                    // L con giro 3D
+  zeta:  [[0,0,0],[1,0,0],[1,1,0],[1,1,1],[2,1,1]],                                    // Z retorcida en 3D
+  te:    [[0,0,0],[1,0,0],[2,0,0],[1,1,0],[1,0,1]],                                    // T con puas
+  cruz:  [[1,0,0],[0,1,0],[1,1,0],[2,1,0],[1,2,0],[1,1,1]],                             // cruz con nucleo
+  tri:   [[0,0,0],[1,0,0],[0,1,0],[0,0,1]]                                             // tetraedro-cubico
+};
+
+function rotAxis(offsets, axis){
+  return offsets.map(([x,y,z])=>{
+    if(axis==='x') return [x,-z,y];
+    if(axis==='y') return [z,y,-x];
+    return [-y,x,z];
+  });
+}
+function normOff(offsets){
+  const mx=Math.min(...offsets.map(o=>o[0])), my=Math.min(...offsets.map(o=>o[1])), mz=Math.min(...offsets.map(o=>o[2]));
+  return offsets.map(([x,y,z])=>[x-mx,y-my,z-mz]);
+}
+function keyOff(offsets){ return offsets.map(o=>o.join(',')).sort().join('|'); }
+function genOrientations(base){
+  let start=normOff(base);
+  let seen=new Set([keyOff(start)]);
+  let list=[start];
+  let i=0;
+  while(i<list.length){
+    const cur=list[i++];
+    for(const ax of ['x','y','z']){
+      const r=normOff(rotAxis(cur,ax));
+      const k=keyOff(r);
+      if(!seen.has(k)){ seen.add(k); list.push(r); }
+    }
+  }
+  return list;
+}
+const ORIENTATIONS={}, PIECE_NAMES=Object.keys(SHAPES);
+PIECE_NAMES.forEach(n=>ORIENTATIONS[n]=genOrientations(SHAPES[n]));
+
+/* ============================== STACK GRID ============================== */
+// stack[y][x][z] = color int or null
+let stack;
+function freshStack(){
+  stack=[];
+  for(let y=0;y<GY;y++){
+    const layer=[];
+    for(let x=0;x<GX;x++){ layer.push(new Array(GZ).fill(null)); }
+    stack.push(layer);
+  }
+}
+freshStack();
+
+function cellOccupied(x,y,z){
+  if(x<0||x>=GX||z<0||z>=GZ||y<0) return true; // paredes / piso
+  if(y>=GY) return false; // libre por arriba
+  return stack[y][x][z]!==null;
+}
+
+/* ============================== THREE.JS SETUP ============================== */
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x111318);
+
+const camera=new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 200);
+const center=new THREE.Vector3(GX/2-0.5, GY*0.32, GZ/2-0.5);
+
+// camera spherical control
+let camTheta=Math.PI*0.28, camPhi=1.15, camRadius=15;
+function updateCamera(){
+  const x=center.x + camRadius*Math.sin(camPhi)*Math.sin(camTheta);
+  const y=center.y + camRadius*Math.cos(camPhi);
+  const z=center.z + camRadius*Math.sin(camPhi)*Math.cos(camTheta);
+  camera.position.set(x,y,z);
+  camera.lookAt(center);
+}
+updateCamera();
+
+// lighting
+const ambient=new THREE.AmbientLight(0xffffff, 0.85);
+scene.add(ambient);
+const dir=new THREE.DirectionalLight(0xffffff,0.6);
+dir.position.set(5,10,7);
+scene.add(dir);
+const neonLight1=new THREE.PointLight(0x0ff0fc, 0, 30);
+neonLight1.position.set(GX,GY*0.6,GZ);
+scene.add(neonLight1);
+const neonLight2=new THREE.PointLight(0xff2fd0, 0, 30);
+neonLight2.position.set(-2,GY*0.4,-2);
+scene.add(neonLight2);
+
+// well wireframe (boundary of the cube)
+const wellGeo=new THREE.BoxGeometry(GX, GY, GZ);
+const wellEdges=new THREE.EdgesGeometry(wellGeo);
+const wellMat=new THREE.LineBasicMaterial({color:0x39415a});
+const wellLines=new THREE.LineSegments(wellEdges, wellMat);
+wellLines.position.set(GX/2-0.5, GY/2-0.5, GZ/2-0.5);
+scene.add(wellLines);
+
+// floor grid (synthwave floor) — fades in with transition
+const floorGeo=new THREE.PlaneGeometry(60,60,30,30);
+const floorMat=new THREE.MeshBasicMaterial({color:0xff2fd0, wireframe:true, transparent:true, opacity:0});
+const floorGrid=new THREE.Mesh(floorGeo, floorMat);
+floorGrid.rotation.x=-Math.PI/2;
+floorGrid.position.set(GX/2-0.5, -0.51, GZ/2-0.5);
+scene.add(floorGrid);
+
+function resize(){
+  const w=innerWidth, h=innerHeight;
+  renderer.setSize(w,h);
+  camera.aspect=w/h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ============================== MESH GROUPS ============================== */
+const stackGroup=new THREE.Group();
+scene.add(stackGroup);
+let stackMeshes=[]; // list of {mesh, edge, x,y,z}
+
+function makeBlockMesh(colorHex){
+  const geo=new THREE.BoxGeometry(0.94,0.94,0.94);
+  const mat=new THREE.MeshStandardMaterial({color:colorHex, emissive:colorHex, emissiveIntensity:0.15, roughness:0.4, metalness:0.15});
+  const mesh=new THREE.Mesh(geo, mat);
+  const edgeGeo=new THREE.EdgesGeometry(geo);
+  const edgeMat=new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:0.35});
+  const edge=new THREE.LineSegments(edgeGeo, edgeMat);
+  mesh.add(edge);
+  mesh.userData.baseColor=colorHex;
+  mesh.userData.edge=edge;
+  return mesh;
+}
+
+function rebuildStackMeshes(){
+  stackMeshes.forEach(o=>stackGroup.remove(o.mesh));
+  stackMeshes=[];
+  for(let y=0;y<GY;y++)for(let x=0;x<GX;x++)for(let z=0;z<GZ;z++){
+    const c=stack[y][x][z];
+    if(c!==null){
+      const mesh=makeBlockMesh(c);
+      mesh.position.set(x,y,z);
+      stackGroup.add(mesh);
+      stackMeshes.push({mesh,x,y,z});
+    }
+  }
+}
+
+/* ============================== ACTIVE PIECE ============================== */
+let active=null;
+function spawnPiece(){
+  const name=PIECE_NAMES[Math.floor(Math.random()*PIECE_NAMES.length)];
+  const orients=ORIENTATIONS[name];
+  const oi=Math.floor(Math.random()*orients.length);
+  const off=orients[oi];
+  const w=Math.max(...off.map(o=>o[0]))+1, d=Math.max(...off.map(o=>o[2]))+1;
+  const px=Math.floor((GX-w)/2), pz=Math.floor((GZ-d)/2);
+  const py=GY-2;
+  const piece={
+    name, orientIndex:oi, offsets:off, x:px, y:py, z:pz,
+    color:COLORS[name], group:new THREE.Group(), fastFall:false
+  };
+  buildPieceMeshes(piece);
+  scene.add(piece.group);
+  if(!validPos(piece, piece.x, piece.y, piece.z, piece.offsets)){
+    triggerGameOver();
+    return null;
+  }
+  return piece;
+}
+function buildPieceMeshes(piece){
+  piece.group.clear ? piece.group.clear() : (piece.group.children=[]);
+  piece.blockMeshes=[];
+  piece.offsets.forEach(([ox,oy,oz])=>{
+    const m=makeBlockMesh(piece.color);
+    m.userData.isActivePiece=true;
+    m.position.set(ox,oy,oz);
+    piece.group.add(m);
+    piece.blockMeshes.push(m);
+  });
+  piece.group.position.set(piece.x, piece.y, piece.z);
+}
+function validPos(piece, nx, ny, nz, offsets){
+  for(const [ox,oy,oz] of offsets){
+    const wx=nx+ox, wy=ny+oy, wz=nz+oz;
+    if(wx<0||wx>=GX||wz<0||wz>=GZ||wy<0) return false;
+    if(wy<GY && stack[wy][wx][wz]!==null) return false;
+  }
+  return true;
+}
+function landingY(piece){
+  let y=piece.y;
+  while(validPos(piece, piece.x, y-1, piece.z, piece.offsets)) y--;
+  return y;
+}
+
+active=null;
+
+function movePiece(dx,dz){
+  if(!active||!gameRunning) return;
+  const nx=active.x+dx, nz=active.z+dz;
+  if(validPos(active, nx, active.y, nz, active.offsets)){
+    active.x=nx; active.z=nz;
+  }
+}
+function rotatePiece(){
+  if(!active||!gameRunning) return;
+  const orients=ORIENTATIONS[active.name];
+  const nextIndex=(active.orientIndex+1)%orients.length;
+  const nextOff=orients[nextIndex];
+  const kicks=[0,-1,1,-2,2];
+  for(const kx of kicks){
+    for(const kz of kicks){
+      if(validPos(active, active.x+kx, active.y, active.z+kz, nextOff)){
+        active.orientIndex=nextIndex;
+        active.offsets=nextOff;
+        active.x+=kx; active.z+=kz;
+        buildPieceMeshes(active);
+        pulseRotateFX();
+        return;
+      }
+    }
+  }
+  // no cabe: pequeño feedback pero no rota
+}
+
+function lockPiece(){
+  if(!active) return;
+  for(const [ox,oy,oz] of active.offsets){
+    const wx=active.x+ox, wy=active.y+oy, wz=active.z+oz;
+    if(wy>=0 && wy<GY) stack[wy][wx][wz]=active.color;
+  }
+  scene.remove(active.group);
+  active=null;
+  clearLayers();
+  rebuildStackMeshes();
+  if(!neonTriggered){ neonTriggered=true; startTransitionToNeon(); }
+  active=spawnPiece();
+}
+
+function clearLayers(){
+  let cleared=0;
+  for(let y=0;y<GY;y++){
+    let full=true;
+    for(let x=0;x<GX&&full;x++)for(let z=0;z<GZ&&full;z++){ if(stack[y][x][z]===null) full=false; }
+    if(full){
+      stack.splice(y,1);
+      stack.push(new Array(GX).fill(null).map(()=>new Array(GZ).fill(null)));
+      cleared++; y--;
+    }
+  }
+  if(cleared>0){
+    const base=[0,100,300,500,800][Math.min(cleared,4)];
+    score+=base*level;
+    layersCleared+=cleared;
+    spawnClearFX(cleared);
+    updateLevel();
+  }
+}
+
+function updateLevel(){
+  const newLevel=Math.min(99, 1+Math.floor(layersCleared*3+elapsed/6));
+  if(newLevel!==level){
+    level=newLevel;
+    pulseLevelUpFX();
+    if(level>=99 && !winFlag){ triggerWin(); }
+  }
+}
+
+/* ============================== FALL TIMING ============================== */
+let fallAcc=0;
+function fallInterval(){
+  const base=Math.max(60, 900-(level-1)*8.5);
+  if(active && active.fastFall) return base*0.18;
+  return base;
+}
+function tickFall(dtMs){
+  if(!active||!gameRunning) return;
+  fallAcc+=dtMs;
+  const ly=landingY(active);
+  active.fastFall = (active.y-ly)<=2;
+  const interval=fallInterval();
+  while(fallAcc>=interval){
+    fallAcc-=interval;
+    if(validPos(active, active.x, active.y-1, active.z, active.offsets)){
+      active.y-=1;
+    } else {
+      lockPiece();
+      break;
+    }
+  }
+}
+function hardDrop(){
+  if(!active||!gameRunning) return;
+  const ly=landingY(active);
+  score+=(active.y-ly)*2;
+  active.y=ly;
+  lockPiece();
+}
+
+/* ============================== VISUAL TRANSITION 2D -> NEON ============================== */
+const appEl=document.getElementById('app');
+function startTransitionToNeon(){
+  const dur=6000; const t0=performance.now();
+  function step(now){
+    const p=Math.min(1,(now-t0)/dur);
+    transitionT=p;
+    applyTransition(p);
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+function applyTransition(p){
+  appEl.classList.toggle('neon', p>0.05);
+  canvas.classList.toggle('neon-glow', p>0.2);
+  floorMat.opacity=0.22*p;
+  neonLight1.intensity=1.6*p;
+  neonLight2.intensity=1.4*p;
+  scene.background=new THREE.Color().lerpColors(new THREE.Color(0x111318), new THREE.Color(0x05030d), p);
+  wellMat.color=new THREE.Color().lerpColors(new THREE.Color(0x39415a), new THREE.Color(0x0ff0fc), p);
+  ambient.intensity=0.85-0.35*p;
+  stackMeshes.forEach(o=>{ o.mesh.material.emissiveIntensity=0.15+0.85*p; o.mesh.userData.edge.material.opacity=0.35+0.4*p; });
+}
+
+/* ============================== INPUT: camera drag vs piece click ============================== */
+const raycaster=new THREE.Raycaster();
+const ptr=new THREE.Vector2();
+let dragging=false, dragStart=null, dragMoved=false, lastPtr=null;
+
+function ptrPos(e){
+  const t = e.touches? e.touches[0] : e;
+  return {x:t.clientX, y:t.clientY};
+}
+function onPointerDown(e){
+  const p=ptrPos(e);
+  dragging=true; dragMoved=false; dragStart=p; lastPtr=p;
+}
+function onPointerMove(e){
+  if(!dragging) return;
+  const p=ptrPos(e);
+  const dx=p.x-lastPtr.x, dy=p.y-lastPtr.y;
+  if(Math.abs(p.x-dragStart.x)+Math.abs(p.y-dragStart.y)>6) dragMoved=true;
+  if(dragMoved){
+    camTheta -= dx*0.008;
+    camPhi = Math.min(Math.PI-0.08, Math.max(0.08, camPhi - dy*0.008));
+    updateCamera();
+  }
+  lastPtr=p;
+}
+function onPointerUp(e){
+  if(dragging && !dragMoved){
+    tryClickRotate(dragStart);
+  }
+  dragging=false;
+}
+function tryClickRotate(p){
+  if(!active||!gameRunning) return;
+  const rect=canvas.getBoundingClientRect();
+  ptr.x=((p.x-rect.left)/rect.width)*2-1;
+  ptr.y=-((p.y-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(ptr, camera);
+  const hits=raycaster.intersectObjects(active.blockMeshes, true);
+  if(hits.length>0){ rotatePiece(); }
+}
+canvas.addEventListener('mousedown', onPointerDown);
+canvas.addEventListener('mousemove', onPointerMove);
+window.addEventListener('mouseup', onPointerUp);
+canvas.addEventListener('touchstart', e=>{ onPointerDown(e); }, {passive:true});
+canvas.addEventListener('touchmove', e=>{ onPointerMove(e); }, {passive:true});
+canvas.addEventListener('touchend', e=>{ onPointerUp(e); }, {passive:true});
+canvas.addEventListener('wheel', e=>{ camRadius=Math.min(28,Math.max(7,camRadius+e.deltaY*0.01)); updateCamera(); }, {passive:true});
+
+document.getElementById('camPad').addEventListener('click', e=>{
+  const v=e.target.dataset.v; if(!v) return;
+  if(v==='top'){ camPhi=0.18; camTheta=camTheta; }
+  else if(v==='front'){ camPhi=1.15; camTheta=0; }
+  else if(v==='right'){ camPhi=1.15; camTheta=Math.PI/2; }
+  else if(v==='back'){ camPhi=1.15; camTheta=Math.PI; }
+  else if(v==='left'){ camPhi=1.15; camTheta=-Math.PI/2; }
+  updateCamera();
+});
+
+document.getElementById('movePad').addEventListener('click', e=>{
+  const m=e.target.dataset.m; if(!m) return;
+  if(m==='nx') movePiece(-1,0);
+  if(m==='px') movePiece(1,0);
+  if(m==='fz') movePiece(0,-1);
+  if(m==='bz') movePiece(0,1);
+});
+document.getElementById('rotBtn').addEventListener('click', rotatePiece);
+document.getElementById('dropBtn').addEventListener('click', hardDrop);
+
+window.addEventListener('keydown', e=>{
+  if(!gameRunning) return;
+  if(e.key==='ArrowLeft') movePiece(-1,0);
+  else if(e.key==='ArrowRight') movePiece(1,0);
+  else if(e.key==='ArrowUp') movePiece(0,-1);
+  else if(e.key==='ArrowDown') movePiece(0,1);
+  else if(e.key===' '){ e.preventDefault(); hardDrop(); }
+  else if(e.key==='r'||e.key==='R') rotatePiece();
+});
+
+/* ============================== SIMPLE FX (rotate pulse / clear burst / levelup) ============================== */
+function pulseRotateFX(){
+  neonLight1.intensity = Math.min(2.4, neonLight1.intensity+0.6);
+}
+const pCanvas=document.getElementById('particles');
+const pCtx=pCanvas.getContext('2d');
+function resizeP(){ pCanvas.width=innerWidth; pCanvas.height=innerHeight; }
+window.addEventListener('resize', resizeP); resizeP();
+let particles=[];
+function spawnClearFX(n){
+  for(let i=0;i<30+n*20;i++){
+    particles.push({
+      x:innerWidth/2+(Math.random()-0.5)*200, y:innerHeight/2+(Math.random()-0.5)*100,
+      vx:(Math.random()-0.5)*8, vy:(Math.random()-1.4)*8, life:60+Math.random()*30,
+      color:['#0ff0fc','#ff2fd0','#f6ff2f','#2fff8f'][Math.floor(Math.random()*4)]
+    });
+  }
+}
+function spawnWinFX(){
+  for(let i=0;i<220;i++){
+    particles.push({
+      x:innerWidth/2, y:innerHeight/2,
+      vx:(Math.random()-0.5)*16, vy:(Math.random()-0.9)*16, life:100+Math.random()*60,
+      color:['#0ff0fc','#ff2fd0','#f6ff2f','#2fff8f','#a52fff'][Math.floor(Math.random()*5)]
+    });
+  }
+}
+function pulseLevelUpFX(){
+  document.getElementById('levelVal').style.transform='scale(1.5)';
+  setTimeout(()=>{ document.getElementById('levelVal').style.transform='scale(1)'; },250);
+}
+function stepParticles(){
+  pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+  particles=particles.filter(pt=>pt.life>0);
+  particles.forEach(pt=>{
+    pt.x+=pt.vx; pt.y+=pt.vy; pt.vy+=0.15; pt.life--;
+    pCtx.globalAlpha=Math.max(0,pt.life/100);
+    pCtx.fillStyle=pt.color;
+    pCtx.fillRect(pt.x,pt.y,4,4);
+  });
+  pCtx.globalAlpha=1;
+}
+
+/* ============================== AUDIO: procedural psy-trance ============================== */
+let actx=null, masterGain=null, muted=false;
+let filterNode=null, filterLFO=null;
+const SCALE=[0,3,5,7,10,12,15]; // escala menor pentatonica-ish
+function initAudio(){
+  if(actx) return;
+  actx=new (window.AudioContext||window.webkitAudioContext)();
+  masterGain=actx.createGain(); masterGain.gain.value=0.35;
+  masterGain.connect(actx.destination);
+  filterNode=actx.createBiquadFilter();
+  filterNode.type='lowpass'; filterNode.frequency.value=800; filterNode.Q.value=6;
+  filterNode.connect(masterGain);
+}
+let nextNoteTime=0, step16=0, schedulerId=null;
+const STEP_DUR=()=>60/145/4; // 145 bpm psytrance-ish, en segundos
+function scheduleStep(time, stepIdx){
+  // rolling bass 16ths
+  const root=41.2; // E1 aprox
+  const bassOsc=actx.createOscillator();
+  const bassGain=actx.createGain();
+  bassOsc.type='sawtooth';
+  const semis = stepIdx%4===0? 0 : (stepIdx%8===4? 7:0);
+  bassOsc.frequency.setValueAtTime(root*Math.pow(2,semis/12), time);
+  bassGain.gain.setValueAtTime(0.0001, time);
+  bassGain.gain.exponentialRampToValueAtTime(0.5, time+0.01);
+  bassGain.gain.exponentialRampToValueAtTime(0.0001, time+STEP_DUR()*0.85);
+  bassOsc.connect(bassGain); bassGain.connect(filterNode);
+  bassOsc.start(time); bassOsc.stop(time+STEP_DUR());
+
+  // filter sweep LFO feel
+  const sweep=400+Math.sin(stepIdx*0.35+elapsed*0.6)*350 + level*4;
+  filterNode.frequency.setValueAtTime(Math.max(150,sweep), time);
+
+  // hi-hat every step, offbeat accent
+  if(stepIdx%2===1){
+    const hatOsc=actx.createOscillator();
+    const hatGain=actx.createGain();
+    hatOsc.type='square'; hatOsc.frequency.value=6000;
+    hatGain.gain.setValueAtTime(0.05, time);
+    hatGain.gain.exponentialRampToValueAtTime(0.0001, time+0.05);
+    hatOsc.connect(hatGain); hatGain.connect(masterGain);
+    hatOsc.start(time); hatOsc.stop(time+0.06);
+  }
+  // arpeggio lead every 4 steps
+  if(stepIdx%4===0){
+    const note=SCALE[Math.floor(Math.random()*SCALE.length)];
+    const freq=220*Math.pow(2, note/12);
+    const leadOsc=actx.createOscillator();
+    const leadGain=actx.createGain();
+    leadOsc.type='triangle'; leadOsc.frequency.setValueAtTime(freq, time);
+    leadGain.gain.setValueAtTime(0.0001, time);
+    leadGain.gain.exponentialRampToValueAtTime(0.12, time+0.02);
+    leadGain.gain.exponentialRampToValueAtTime(0.0001, time+0.35);
+    leadOsc.connect(leadGain); leadGain.connect(masterGain);
+    leadOsc.start(time); leadOsc.stop(time+0.4);
+  }
+  // kick every 4 steps (four-on-the-floor psy kick)
+  if(stepIdx%4===0){
+    const kOsc=actx.createOscillator();
+    const kGain=actx.createGain();
+    kOsc.type='sine';
+    kOsc.frequency.setValueAtTime(150, time);
+    kOsc.frequency.exponentialRampToValueAtTime(45, time+0.12);
+    kGain.gain.setValueAtTime(0.6, time);
+    kGain.gain.exponentialRampToValueAtTime(0.0001, time+0.22);
+    kOsc.connect(kGain); kGain.connect(masterGain);
+    kOsc.start(time); kOsc.stop(time+0.25);
+  }
+}
+function audioScheduler(){
+  if(!actx) return;
+  while(nextNoteTime < actx.currentTime+0.12){
+    scheduleStep(nextNoteTime, step16%16);
+    nextNoteTime += STEP_DUR();
+    step16++;
+  }
+}
+function startMusic(){
+  initAudio();
+  if(actx.state==='suspended') actx.resume();
+  nextNoteTime=actx.currentTime+0.05; step16=0;
+  if(schedulerId) clearInterval(schedulerId);
+  schedulerId=setInterval(audioScheduler, 30);
+}
+function stopMusic(){ if(schedulerId){ clearInterval(schedulerId); schedulerId=null; } }
+document.getElementById('muteBtn').addEventListener('click', ()=>{
+  muted=!muted;
+  if(masterGain) masterGain.gain.value= muted?0:0.35;
+  document.getElementById('muteBtn').textContent= muted? '✕':'♪';
+});
+
+/* ============================== HUD UPDATE ============================== */
+function updateHUD(){
+  document.getElementById('scoreVal').textContent=String(Math.floor(score)).padStart(6,'0');
+  document.getElementById('levelVal').textContent=String(level).padStart(2,'0');
+  document.getElementById('linesVal').textContent=String(layersCleared);
+}
+
+/* ============================== GAME FLOW ============================== */
+function triggerGameOver(){
+  gameRunning=false; gameOverFlag=true;
+  stopMusic();
+  document.getElementById('overScore').textContent='SCORE: '+Math.floor(score);
+  document.getElementById('overScreen').classList.remove('hidden');
+}
+function triggerWin(){
+  winFlag=true; gameRunning=false;
+  stopMusic();
+  document.getElementById('winScore').textContent='SCORE FINAL: '+Math.floor(score);
+  document.getElementById('winScreen').classList.remove('hidden');
+  spawnWinFX();
+  const t0=performance.now();
+  (function burst(){ if(performance.now()-t0<3000){ spawnWinFX(); setTimeout(burst,400);} })();
+}
+function resetGame(){
+  freshStack();
+  rebuildStackMeshes();
+  level=1; score=0; layersCleared=0; elapsed=0; transitionT=0; neonTriggered=false;
+  appEl.classList.remove('neon'); canvas.classList.remove('neon-glow');
+  floorMat.opacity=0; neonLight1.intensity=0; neonLight2.intensity=0;
+  scene.background=new THREE.Color(0x111318);
+  wellMat.color=new THREE.Color(0x39415a);
+  ambient.intensity=0.85;
+  camTheta=Math.PI*0.28; camPhi=1.15; camRadius=15; updateCamera();
+  if(active){ scene.remove(active.group); }
+  active=spawnPiece();
+  gameOverFlag=false; winFlag=false; gameRunning=true;
+  updateHUD();
+  startMusic();
+}
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  document.getElementById('startScreen').classList.add('hidden');
+  resetGame();
+});
+document.getElementById('retryBtn').addEventListener('click', ()=>{
+  document.getElementById('overScreen').classList.add('hidden');
+  resetGame();
+});
+document.getElementById('againBtn').addEventListener('click', ()=>{
+  document.getElementById('winScreen').classList.add('hidden');
+  resetGame();
+});
+
+/* ============================== MAIN LOOP ============================== */
+let lastT=performance.now();
+function animate(now){
+  requestAnimationFrame(animate);
+  const dt=Math.min(80, now-lastT); lastT=now;
+  if(gameRunning){
+    elapsed += dt/1000;
+    tickFall(dt);
+    updateLevel();
+    updateHUD();
+  }
+  if(active){
+    active.group.position.set(active.x, active.y, active.z);
+    const t=now*0.004;
+    active.blockMeshes.forEach(m=>{ m.material.emissiveIntensity = 0.4+0.3*Math.sin(t)*transitionT+0.15; });
+  }
+  neonLight1.intensity = Math.max(1.6*transitionT, neonLight1.intensity*0.92);
+  floorGrid.rotation.z += 0.0006*(0.3+transitionT);
+  stepParticles();
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+
+})();
+</script>
+</body>
+</html>
