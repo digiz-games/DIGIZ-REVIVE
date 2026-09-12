@@ -70,6 +70,7 @@
 
 <div id="msgOverlay">
   <h2 id="msgTitle">PAC-MAL</h2>
+  <p id="msgBody"></p>
   <button id="startBtn">▶ COMENZAR</button>
 </div>
 
@@ -166,6 +167,7 @@ document.getElementById('soundBtn').addEventListener('click', ()=>{
   soundOn = !soundOn;
   document.getElementById('soundBtn').textContent = soundOn?'🔊':'🔇';
   if(soundOn) startSiren();
+  else stopSirenAudible();
 });
 
 /* ============================= GRID / DOTS ============================= */
@@ -217,6 +219,7 @@ function buildGrid(){
 }
 
 function isOpen(col,row){
+  row = Math.round(row); col = Math.round(col);
   if(row===TUNNEL_ROW && (col<0 || col>=COLS)) return true;
   if(row<0||row>=ROWS) return false;
   let c=col;
@@ -273,6 +276,46 @@ const PAC_START = {col:7, row:13};
 
 let pac, ghosts, controlledId;
 let score=0, lives=3, pacmanIQ=1, frightTimer=0, chainCount=0;
+// Modo scatter/chase igual al Pac-Man original: los fantasmas alternan entre
+// perseguir directamente (chase) y retirarse a su esquina (scatter) en vez
+// de acosar a pacman todo el tiempo. Sin esto se ven robóticos/monótonos.
+// Si mientras tanto un fantasma queda "frightened" (asustado), el reloj se
+// pausa (igual que en el original) y sigue justo donde quedó al terminar.
+const GHOST_MODE_SCHEDULE = [
+  {mode:'scatter', dur:7}, {mode:'chase', dur:20},
+  {mode:'scatter', dur:7}, {mode:'chase', dur:20},
+  {mode:'scatter', dur:5}, {mode:'chase', dur:20},
+  {mode:'scatter', dur:5}, {mode:'chase', dur:999999}
+];
+let ghostModeIndex = 0;
+let ghostMode = GHOST_MODE_SCHEDULE[0].mode;
+let ghostModeTimer = GHOST_MODE_SCHEDULE[0].dur;
+
+function resetGhostMode(){
+  ghostModeIndex = 0;
+  ghostMode = GHOST_MODE_SCHEDULE[0].mode;
+  ghostModeTimer = GHOST_MODE_SCHEDULE[0].dur;
+}
+
+function updateGhostMode(dt){
+  ghostModeTimer -= dt;
+  if(ghostModeTimer<=0 && ghostModeIndex < GHOST_MODE_SCHEDULE.length-1){
+    ghostModeIndex++;
+    ghostMode = GHOST_MODE_SCHEDULE[ghostModeIndex].mode;
+    ghostModeTimer = GHOST_MODE_SCHEDULE[ghostModeIndex].dur;
+    // Al cambiar de modo, los fantasmas normales dan media vuelta al
+    // instante (comportamiento icónico del original) — salvo el que
+    // controla el jugador, que sigue respondiendo solo a sus teclas.
+    ghosts.forEach(g=>{
+      if(g.state!=='normal' || g.def.id===controlledId || g.dir.name==='NONE') return;
+      const revName = OPPOSITE[g.dirName];
+      const rev = DIRS[revName];
+      if(isOpen(g.col+rev.x, g.row+rev.y)){
+        g.dirName = revName; g.dir = rev;
+      }
+    });
+  }
+}
 let gameState = 'playing'; // playing | paused | roundover
 let freezeTimer = 0;
 let message = null; // {title, body, autoHideAfter}
@@ -298,11 +341,18 @@ function makeGhosts(){
 
 function resetPositionsOnly(){
   pac.col=PAC_START.col; pac.row=PAC_START.row; pac.dirName='NONE'; pac.dir=DIRS.NONE; pac.nextDirName='LEFT';
+  pac._lastDecisionTile = null;
   ghosts.forEach(g=>{
     g.col=g.def.start.col; g.row=g.def.start.row; g.dirName='UP'; g.dir=DIRS.UP;
     g.state='house'; g.releaseTimer = g.def.releaseDelay;
+    g._lastDecisionTile = null;
   });
   frightTimer=0; chainCount=0;
+  resetGhostMode();
+  // Sin esto, cada vez que pierdes una vida tu fantasma controlado volvía a
+  // quedar encerrado en la casa esperando su temporizador de salida
+  // (hasta 5.5s con Clyde) antes de volver a responder al teclado.
+  releaseControlledFromHouse();
 }
 
 function startNewRound(keepIQ){
@@ -311,8 +361,18 @@ function startNewRound(keepIQ){
   ghosts = makeGhosts();
   lives = 3;
   frightTimer = 0; chainCount=0;
+  resetGhostMode();
   controlledId = GHOST_DEFS[Math.floor(Math.random()*GHOST_DEFS.length)].id;
+  releaseControlledFromHouse();
   updateHUD();
+}
+
+// El fantasma controlado por el jugador siempre debe responder al instante:
+// si le tocó uno que seguía esperando su turno de salida en la casa, lo
+// liberamos ahí mismo para que las teclas funcionen de inmediato.
+function releaseControlledFromHouse(){
+  const cg = ghosts.find(g=>g.def.id===controlledId);
+  if(cg && cg.state==='house'){ cg.state='normal'; cg.releaseTimer=0; }
 }
 
 /* ============================= INPUT ============================= */
@@ -320,14 +380,40 @@ const KEYMAP = {
   ArrowUp:'UP', ArrowDown:'DOWN', ArrowLeft:'LEFT', ArrowRight:'RIGHT',
   w:'UP', s:'DOWN', a:'LEFT', d:'RIGHT', W:'UP', S:'DOWN', A:'LEFT', D:'RIGHT'
 };
+// Pila de direcciones actualmente sostenidas (no solo "la última tecla que
+// tocaste"): mientras sostenés una tecla, el fantasma se mueve; al soltarla
+// sin sostener ninguna otra, se detiene. Se resuelve de la más reciente a la
+// más vieja para permitir "preparar" un giro sin soltar la tecla con la que
+// venías (si la más nueva todavía no es válida en esta casilla, se usa la
+// anterior que sí lo sea).
+let heldDirStack = [];
+function currentValidHeldDir(g){
+  for(let i=heldDirStack.length-1; i>=0; i--){
+    const d = DIRS[heldDirStack[i]];
+    if(isOpen(g.col+d.x, g.row+d.y)) return d;
+  }
+  return null;
+}
 window.addEventListener('keydown', (e)=>{
   const d = KEYMAP[e.key];
   if(d){
     e.preventDefault();
-    const g = ghosts && ghosts.find(gg=>gg.def.id===controlledId);
-    if(g) g.wantedDirName = d;
+    const idx = heldDirStack.indexOf(d);
+    if(idx!==-1) heldDirStack.splice(idx,1);
+    heldDirStack.push(d);
   }
 });
+window.addEventListener('keyup', (e)=>{
+  const d = KEYMAP[e.key];
+  if(d){
+    const idx = heldDirStack.indexOf(d);
+    if(idx!==-1) heldDirStack.splice(idx,1);
+  }
+});
+// Si la ventana pierde el foco (cambiás de pestaña, etc.) las teclas quedan
+// "sostenidas" para siempre según el navegador — se limpia la pila para que
+// el fantasma no siga moviéndose solo.
+window.addEventListener('blur', ()=>{ heldDirStack.length = 0; });
 canvas.addEventListener('click', ()=>{ ensureAudio(); startSiren(); });
 
 /* ============================= LÓGICA DE FANTASMAS ============================= */
@@ -335,6 +421,7 @@ function ghostTarget(g){
   if(g.state==='eaten') return HOUSE_CENTER;
   if(g.state==='frightened') return {col:pac.col,row:pac.row}; // se usa con maximize=true (huir)
   if(g.def.id===controlledId) return null; // controlado por jugador
+  if(ghostMode==='scatter') return g.def.corner; // retirada periódica a su esquina, como en el original
   switch(g.def.id){
     case 'blinky':
       return {col:pac.col, row:pac.row};
@@ -357,9 +444,34 @@ function ghostTarget(g){
 }
 
 function moveEntityStep(ent, dt, isPac){
-  const atCenterCol = Math.abs(ent.col - Math.round(ent.col)) < 0.06;
-  const atCenterRow = Math.abs(ent.row - Math.round(ent.row)) < 0.06;
-  if(atCenterCol && atCenterRow){
+  // La ventana de detección de "centro de casilla" debe ser lo bastante ancha
+  // para no saltársela a alta velocidad, PERO sin la clave de "última casilla
+  // decidida" de abajo, quedarse varios frames dentro de esa ventana hace que
+  // se recalcule la dirección repetidas veces en la misma esquina y el
+  // personaje tartamudee/se trabe ahí en vez de comprometerse a un rumbo.
+  const curSpd = (isPac? (pac._effSpeed||ent.speed) : (ent._effSpeed||ent.speed));
+  const centerEps = Math.max(0.09, curSpd*0.05*0.6);
+  const atCenterCol = Math.abs(ent.col - Math.round(ent.col)) < centerEps;
+  const atCenterRow = Math.abs(ent.row - Math.round(ent.row)) < centerEps;
+  const tileKey = Math.round(ent.col)+','+Math.round(ent.row);
+  // Si la entidad está detenida (dir NONE), siempre se re-evalúa cada frame:
+  // al estar quieta jamás sale de la zona de centro, así que el candado de
+  // "ya decidí en esta casilla" de abajo nunca se soltaría solo, dejando al
+  // fantasma trabado para siempre en cuanto termina su espera en la casa
+  // (o en cuanto se le entrega el control al jugador). No hay riesgo de
+  // tartamudeo aquí porque, al no moverse, no hay ninguna esquina que cruzar.
+  // OJO: NO conviene forzar la re-decisión en cada frame mientras se está
+  // en movimiento (ni siquiera para el fantasma del jugador): cada vez que
+  // se "decide" también se clava la posición al entero más cercano, así
+  // que forzarlo cada frame crea un bucle infinito de avanzar-un-poco y
+  // clavarse-de-vuelta, sin que el fantasma logre salir jamás de la casilla.
+  // En su lugar, el candado se libera explícitamente en los puntos exactos
+  // donde hace falta una decisión nueva (te reasignan el control, o la
+  // dirección actual choca contra una pared) — ver releaseControlledFromHouse,
+  // reassignControl y el bloque de "pared" más abajo.
+  const forceRedecide = ent.dir.name==='NONE';
+  if(atCenterCol && atCenterRow && (forceRedecide || ent._lastDecisionTile!==tileKey)){
+    ent._lastDecisionTile = tileKey;
     ent.col = Math.round(ent.col); ent.row = Math.round(ent.row);
     // decidir nueva dirección
     let newDir = null;
@@ -368,16 +480,24 @@ function moveEntityStep(ent, dt, isPac){
     } else {
       newDir = ghostDecision(ent);
     }
+    const isControlledGhost = !isPac && ent.def && ent.def.id===controlledId;
     if(newDir && newDir.name!=='NONE'){
       ent.dirName = newDir.name; ent.dir = newDir;
-    } else if(!isOpen(ent.col+ent.dir.x, ent.row+ent.dir.y)){
+    } else if(isControlledGhost || ent.state==='house' || !isOpen(ent.col+ent.dir.x, ent.row+ent.dir.y)){
+      // Para tu fantasma, NONE siempre significa "quieto de verdad" (no
+      // sostenés ninguna tecla con camino válido) — sin el chequeo de
+      // isControlledGhost de acá, si tu dirección anterior seguía abierta,
+      // el fantasma hubiera seguido andando solo aunque soltaras la tecla.
+      // 'house' fuerza quietud: sin esto, un fantasma en la casa podía seguir
+      // derivando con su dirección inicial (arriba) y "escapar" solo, aunque
+      // el jugador lo estuviera controlando y sus teclas no tuvieran efecto.
       ent.dir = DIRS.NONE; ent.dirName='NONE';
     }
+  } else if(!atCenterCol || !atCenterRow){
+    // salió de la zona de la última casilla decidida: habilita la próxima decisión
+    ent._lastDecisionTile = null;
   }
   const spd = (isPac? pac._effSpeed : ent._effSpeed) || ent.speed;
-  if(isOpen(ent.col+ent.dir.x*0.001+ (ent.dir.x?Math.sign(ent.dir.x)*0:0), ent.row) || true){
-    // mover si la dirección actual sigue siendo válida en el sentido de avance
-  }
   if(ent.dir.name!=='NONE'){
     const nextCol = ent.col + ent.dir.x*spd*dt;
     const nextRow = ent.row + ent.dir.y*spd*dt;
@@ -390,6 +510,13 @@ function moveEntityStep(ent, dt, isPac){
       const distToCenterRow = Math.round(ent.row)-ent.row;
       if(Math.abs(distToCenterCol) < spd*dt+0.01 && Math.abs(distToCenterRow) < spd*dt+0.01){
         ent.col = Math.round(ent.col); ent.row = Math.round(ent.row);
+        // Genuinamente bloqueado y detenido: soltar el candado de "ya decidí
+        // en esta casilla" para que el próximo frame se evalúe una decisión
+        // nueva sí o sí. Sin esto, si el candado ya apuntaba a esta misma
+        // casilla por otro motivo (ej. se te reasignó el control a mitad de
+        // camino, heredando una dirección que acá resulta bloqueada), la
+        // entidad podía quedar congelada contra la pared para siempre.
+        ent._lastDecisionTile = null;
       } else {
         ent.col = nextCol; ent.row = nextRow;
       }
@@ -445,16 +572,35 @@ function pacDecision(ent){
   });
 }
 
+function pickRandomDirection(entity){
+  // Movimiento realmente al azar en cada esquina, igual que el Pac-Man
+  // original: un fantasma asustado NO huye "inteligentemente" del jugador,
+  // solo elige cualquier dirección válida sin preferencia.
+  const all = [DIRS.UP,DIRS.DOWN,DIRS.LEFT,DIRS.RIGHT];
+  const reverseName = OPPOSITE[entity.dirName];
+  let candidates = all.filter(d => d.name!==reverseName && isOpen(entity.col+d.x, entity.row+d.y));
+  if(candidates.length===0){
+    candidates = all.filter(d => isOpen(entity.col+d.x, entity.row+d.y));
+  }
+  if(candidates.length===0) return DIRS.NONE;
+  return candidates[Math.floor(Math.random()*candidates.length)];
+}
+
 function ghostDecision(g){
   if(g.state==='house') return DIRS.NONE;
   if(g.def.id===controlledId){
-    g._effSpeed = g.state==='frightened' ? 3.1 : (g.state==='eaten'?6.5:4.0);
-    if(g.wantedDirName){
-      const d = DIRS[g.wantedDirName];
-      if(isOpen(g.col+d.x, g.row+d.y)) { g.wantedDirName=null; return d; }
-    }
-    // seguir en línea recta si se puede
-    return isOpen(g.col+g.dir.x, g.row+g.dir.y) ? g.dir : pickDirection(g, {col:g.col+g.dir.x*3,row:g.row+g.dir.y*3}, {randomFactor:0.5});
+    // Tu fantasma tiene que poder ALCANZAR a pacman para que "perseguirlo"
+    // tenga sentido. Pacman anda entre 4.32 y 5.6 según su IQ (ver
+    // pacDecision: 4.2 + min(iq*0.12, 1.4)) — con 4.0 fijo, tu fantasma era
+    // más lento que pacman desde la ronda 1 y jamás lo hubieras alcanzado
+    // en línea recta, sin importar qué tan bien lo controlaras.
+    g._effSpeed = g.state==='frightened' ? 3.1 : (g.state==='eaten'?6.5:5.8);
+    // Control tipo "mientras sostenés, se mueve": si ninguna tecla sostenida
+    // tiene un camino válido desde acá (incluido el caso de no sostener
+    // ninguna), el fantasma se queda quieto en vez de seguir solo o elegir
+    // un rumbo al azar.
+    const held = currentValidHeldDir(g);
+    return held || DIRS.NONE;
   }
   const target = ghostTarget(g);
   if(g.state==='eaten'){
@@ -463,7 +609,7 @@ function ghostDecision(g){
   }
   if(g.state==='frightened'){
     g._effSpeed = 2.6;
-    return pickDirection(g, target, {maximize:true, randomFactor:0.35});
+    return pickRandomDirection(g);
   }
   // normal
   let speedMul = 1;
@@ -499,6 +645,7 @@ function reassignControl(excludeId){
   const options = ghosts.filter(g=>g.def.id!==excludeId && g.state!=='eaten');
   if(options.length>0){
     controlledId = options[Math.floor(Math.random()*options.length)].def.id;
+    releaseControlledFromHouse();
     flashMessage('Ahora controlas a '+ghosts.find(g=>g.def.id===controlledId).def.name, 1.6);
   } else {
     controlledId = null;
@@ -715,6 +862,10 @@ function loop(t){
         if(frightTimer<=0){
           ghosts.forEach(g=>{ if(g.state==='frightened') g.state='normal'; });
         }
+      } else {
+        // El reloj de scatter/chase se pausa mientras hay fantasmas
+        // asustados (igual que el original) y sigue donde quedó al terminar.
+        updateGhostMode(dt);
       }
       ghosts.forEach(g=>{
         if(g.state==='house'){
