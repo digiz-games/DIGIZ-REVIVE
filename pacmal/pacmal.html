@@ -316,7 +316,7 @@ function updateGhostMode(dt){
     });
   }
 }
-let gameState = 'playing'; // playing | paused | roundover
+let gameState = 'playing'; // playing | paused | roundover | gameover
 let freezeTimer = 0;
 let message = null; // {title, body, autoHideAfter}
 
@@ -698,18 +698,23 @@ function loseLife(){
 function endRound(winner){
   gameState='roundover';
   if(winner==='pacman'){
+    // Pac-Man logró comer todo el tablero antes de que lo atraparas 3 veces:
+    // se acabó el juego (no se sigue de ronda ni sube la dificultad).
+    sfxRoundLose();
+    showGameOver();
+  } else {
+    // Atrapaste a Pac-Man 3 veces antes de que terminara el tablero: ganás
+    // la ronda y Pac-Man se pone más inteligente para la próxima (antes esto
+    // no pasaba y el juego no "avanzaba de nivel" cuando ganaban los fantasmas).
     pacmanIQ = Math.min(10, pacmanIQ+1);
     sfxRoundWin();
-    showOverlay('¡PAC-MAN GANA LA RONDA!', '');
-  } else {
-    sfxRoundLose();
-    showOverlay('¡LOS FANTASMAS GANAN!', '');
+    showOverlay('¡ATRAPASTE A PAC-MAN 3 VECES!', 'Pac-Man ahora es más inteligente...');
+    setTimeout(()=>{
+      hideOverlay();
+      startNewRound();
+      gameState='playing';
+    }, 3200);
   }
-  setTimeout(()=>{
-    hideOverlay();
-    startNewRound();
-    gameState='playing';
-  }, 3200);
 }
 
 /* ============================= HUD / OVERLAY ============================= */
@@ -726,6 +731,15 @@ function showOverlay(title, body){
   document.getElementById('msgTitle').textContent = title;
   document.getElementById('msgBody').innerHTML = body;
   document.getElementById('startBtn').style.display='none';
+  document.getElementById('msgOverlay').style.display='flex';
+}
+function showGameOver(){
+  gameState = 'gameover';
+  document.getElementById('msgTitle').textContent = 'GAME OVER';
+  document.getElementById('msgBody').innerHTML = 'Pac-Man comió todo el tablero. Puntaje final: '+score;
+  const btn = document.getElementById('startBtn');
+  btn.textContent = '▶ JUGAR DE NUEVO';
+  btn.style.display = '';
   document.getElementById('msgOverlay').style.display='flex';
 }
 function hideOverlay(){ document.getElementById('msgOverlay').style.display='none'; }
@@ -900,12 +914,25 @@ function loop(t){
 }
 
 /* ============================= INICIO ============================= */
+let gameLoopStarted = false;
 document.getElementById('startBtn').addEventListener('click', ()=>{
   ensureAudio(); startSiren();
+  // Reinicia puntaje y dificultad tanto en el primer inicio como al volver
+  // a jugar después de un Game Over.
+  score = 0;
+  pacmanIQ = 1;
+  document.getElementById('startBtn').textContent = '▶ COMENZAR';
   hideOverlay();
   startNewRound();
   gameState='playing';
-  requestAnimationFrame(loop);
+  // El loop ya se re-agenda solo (requestAnimationFrame al final de loop());
+  // si volviéramos a llamarlo acá después de un Game Over, correrían dos
+  // loops en paralelo. Solo se arranca una vez, la primera vez que se hace
+  // click en "comenzar".
+  if(!gameLoopStarted){
+    gameLoopStarted = true;
+    requestAnimationFrame(loop);
+  }
 });
 
 // preparar estado inicial para que el primer frame no falle antes de pulsar "comenzar"
