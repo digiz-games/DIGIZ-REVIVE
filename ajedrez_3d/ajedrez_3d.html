@@ -40,13 +40,13 @@ button{padding:0 10px;min-height:44px}
  <div class="card" id="phase"><div class="small">PLANO</div><div class="big" id="planeName">X–Z · CLÁSICO</div></div>
 </div>
 <div id="msg">Selecciona una pieza blanca.</div>
-<div id="legend">Arrastra: girar vista<br>X–Z = piso<br>X–Y azul · Z–Y rojo</div>
-<div id="controls"><button id="skip">SALTAR PLANO</button><button id="musicBtn" title="Música">♫</button><button id="pause">Ⅱ</button></div>
+<div id="legend">X–Z = piso permanente<br>X–Y azul = pared<br>Z–Y rojo = pared<br>Arrastra = girar vista</div>
+<div id="controls"><button id="musicBtn" title="Música">♫</button><button id="pause">Ⅱ</button></div>
 
 <div class="overlay" id="start">
  <div class="panel">
   <div class="title">TRI-CHESS</div><div class="sub">PROTOTIPO 3D · 2 JUGADORES</div>
-  <div class="desc">Cada pieza existe simultáneamente en <b>tres planos visibles a la vez</b>, unidos por una casilla clara en el origen cartesiano. Elige una sola pieza por turno y muévela en X–Z, Z–Y y X–Y. <b>Arrastra con el dedo</b> para girar libremente la estructura 3D. La cámara no se mueve sola: tú giras manualmente la estructura con el dedo. El tablero clásico permanece siempre como piso y la cámara nunca pasa por debajo. Una captura en cualquier tablero elimina esa pieza de los tres.</div>
+  <div class="desc">Los tres planos son tableros vinculados pero <b>cada plano se juega de forma independiente</b>. En cada plano debes hacer una jugada legal y puedes elegir cualquier pieza de tu color. No se puede saltar. Tras jugar X–Z, Z–Y y X–Y, cambia el turno. La única ley que atraviesa las tres dimensiones es la captura: <b>si una pieza muere en un plano, desaparece de los tres</b>. Arrastra con el dedo para girar manualmente la vista; el tablero clásico permanece siempre como piso.</div>
   <button class="start" id="startBtn">INICIAR</button>
  </div>
 </div>
@@ -129,7 +129,7 @@ function doMove(x,y){
  const pl=currentPlane().id;
  if(!selected){
    const p=occupied(pl,x,y,-1);
-   if(p&&p.color===turn){selected=p;setMsg("Pieza elegida: "+p.type+". Muévela en "+currentPlane().name+".");rebuild()}
+   if(p&&p.color===turn){selected=p;setMsg("Pieza elegida: "+p.type+" en "+currentPlane().name+". Haz una jugada legal.");rebuild()}
    else setMsg("Debes seleccionar una pieza "+(turn==="w"?"blanca.":"negra."));
    return;
  }
@@ -139,17 +139,17 @@ function doMove(x,y){
  if(game)advancePlane();
 }
 function advancePlane(){
+ // Cada plano es una partida local: tras mover, la selección se libera.
+ selected=null;
  phase++;
  if(phase>=3){
-   phase=0;turn=turn==="w"?"b":"w";selected=null;
-   setMsg("Turno de "+(turn==="w"?"BLANCAS":"NEGRAS")+". Selecciona una pieza.");
- }else setMsg("Ahora "+currentPlane().name+". "+(selected?"Mueve la misma pieza o pulsa SALTAR.":""));
+   phase=0;
+   turn=turn==="w"?"b":"w";
+   setMsg("Turno de "+(turn==="w"?"BLANCAS":"NEGRAS")+". Juega obligatoriamente en "+currentPlane().name+".");
+ }else{
+   setMsg("Ahora juega en "+currentPlane().name+". Puedes elegir CUALQUIER pieza "+(turn==="w"?"blanca.":"negra."));
+ }
  updateHUD();rebuild();
-}
-function skip(){
- if(!game||paused)return;
- if(!selected){setMsg("Primero debes elegir la pieza que usarás este turno.");return}
- advancePlane();
 }
 function setMsg(t){document.getElementById("msg").textContent=t}
 function updateHUD(){
@@ -221,17 +221,15 @@ function rebuild(){
    });
  }
 }
-// Cámara manual: el tablero X–Z permanece SIEMPRE como piso.
-// Se permite orbitar alrededor de la estructura, pero nunca bajar bajo el plano del piso.
 let camRadius=18.5,camTheta=.72,camPhi=.92;
 function setOrbit(){
- const cx=4,cy=3.1,cz=4;
- camPhi=Math.max(.20,Math.min(1.48,camPhi)); // < PI/2: cámara siempre sobre el piso
+ const cx=4,cy=4,cz=4;
  const x=cx+camRadius*Math.sin(camPhi)*Math.sin(camTheta);
  const y=cy+camRadius*Math.cos(camPhi);
  const z=cz+camRadius*Math.sin(camPhi)*Math.cos(camTheta);
  camera.position.set(x,y,z);camera.lookAt(cx,cy,cz);
 }
+function updateCam(){setOrbit();}
 let drag=false,moved=false,lastX=0,lastY=0,downX=0,downY=0;
 canvas.addEventListener("pointerdown",e=>{
  drag=true;moved=false;lastX=downX=e.clientX;lastY=downY=e.clientY;
@@ -260,11 +258,10 @@ function pick(e){
  const r=canvas.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;
  ray.setFromCamera(mouse,camera);
  let hits=ray.intersectObjects(pieceMeshes.filter(m=>m.userData.plane===currentPlane().id),false);
- if(hits.length&&!selected){const p=pieces.find(q=>q.id===hits[0].object.userData.pieceId);if(p&&p.color===turn){selected=p;setMsg("Pieza elegida. Muévela en "+currentPlane().name+".");rebuild();return}}
+ if(hits.length&&!selected){const p=pieces.find(q=>q.id===hits[0].object.userData.pieceId);if(p&&p.color===turn){selected=p;setMsg("Pieza elegida en "+currentPlane().name+". Haz una jugada legal.");rebuild();return}}
  hits=ray.intersectObjects(squareMeshes.filter(m=>m.userData.plane===currentPlane().id),false);
  if(hits.length)doMove(hits[0].object.userData.x,hits[0].object.userData.y);
 }
-document.getElementById("skip").onclick=skip;
 document.getElementById("pause").onclick=()=>{if(!game)return;paused=!paused;document.getElementById("pause").textContent=paused?"▶":"Ⅱ";setMsg(paused?"PAUSA":"Continúa la partida.");if(paused)stopBgMusic();else if(musicEnabled)startBgMusic()};
 let musicEnabled=true;
 document.getElementById("musicBtn").onclick=()=>{
@@ -310,7 +307,7 @@ document.getElementById("again").onclick=()=>{document.getElementById("over").cl
 function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
 addEventListener("resize",resize);resize();
 setOrbit();initPieces();rebuild();updateHUD();
-function loop(){requestAnimationFrame(loop);renderer.render(scene,camera)}requestAnimationFrame(loop);
+function loop(){requestAnimationFrame(loop);updateCam();renderer.render(scene,camera)}requestAnimationFrame(loop);
 })();
 </script>
 </body></html>
