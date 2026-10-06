@@ -24,7 +24,13 @@ button:active{transform:scale(.96)}
 .overlay{position:fixed;inset:0;z-index:30;background:radial-gradient(circle at center,#101b35 0,#03050a 68%);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
 .panel{max-width:520px}.title{font-size:clamp(32px,10vw,66px);font-weight:1000;letter-spacing:5px;text-shadow:0 0 18px var(--cyan)}.sub{color:var(--cyan);letter-spacing:3px;font-size:12px}.desc{line-height:1.55;opacity:.8;font-size:13px;margin:20px 0}.start{border:2px solid var(--cyan);color:var(--cyan);font-size:15px;padding:0 24px;box-shadow:0 0 20px rgba(76,245,255,.25)}.hidden{display:none}
 #winner{font-size:30px;font-weight:1000;margin:8px 0}
-@media(max-width:520px){.card{padding:7px 9px}.big{font-size:13px}#msg{top:82px}button{padding:0 12px}}
+@media(max-width:520px){
+.card{padding:6px 8px}.big{font-size:12px}.small{font-size:9px}
+#msg{top:72px;font-size:10px;padding:6px 9px}
+#legend{bottom:70px;font-size:9px}
+button{padding:0 10px;min-height:44px}
+#controls{bottom:8px}
+}
 </style>
 </head>
 <body>
@@ -40,7 +46,7 @@ button:active{transform:scale(.96)}
 <div class="overlay" id="start">
  <div class="panel">
   <div class="title">TRI-CHESS</div><div class="sub">PROTOTIPO 3D · 2 JUGADORES</div>
-  <div class="desc">Cada pieza existe simultáneamente en tres planos. Elige <b>una sola pieza por turno</b> y muévela, si quieres, en X–Z, X–Y y Z–Y. La cámara gira automáticamente al siguiente plano. Una captura en cualquier tablero elimina esa pieza de los tres.</div>
+  <div class="desc">Cada pieza existe simultáneamente en <b>tres planos visibles a la vez</b>. Elige una sola pieza por turno y muévela en X–Z, Z–Y y X–Y. <b>Arrastra con el dedo</b> para girar libremente la estructura 3D. La cámara enfoca cada plano al avanzar, pero tú puedes cambiar el ángulo antes de elegir la casilla. Una captura en cualquier tablero elimina esa pieza de los tres.</div>
   <button class="start" id="startBtn">INICIAR</button>
  </div>
 </div>
@@ -66,7 +72,9 @@ const PLANES=[
  {id:"xy",name:"X–Y · AZUL",dark:0x071d4c,light:0x69a9ff,edge:0x4d8dff}
 ];
 let phase=0,turn="w",selected=null,game=false,paused=false,camT=1;
-let boardGroup=new THREE.Group();scene.add(boardGroup);
+let worldGroup=new THREE.Group();scene.add(worldGroup);
+let boardGroups={xz:new THREE.Group(),zy:new THREE.Group(),xy:new THREE.Group()};
+worldGroup.add(boardGroups.xz,boardGroups.zy,boardGroups.xy);
 let squareMeshes=[],pieceMeshes=[];
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
 const names={K:"♔",Q:"♕",R:"♖",B:"♗",N:"♘",P:"♙"};
@@ -156,47 +164,109 @@ function makeTextSprite(text,color){
  const tex=new THREE.CanvasTexture(cv);const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true});
  const s=new THREE.Sprite(mat);s.scale.set(.78,.78,.78);return s;
 }
+function boardTransform(id,g){
+  // Tres planos cartesianos que se cruzan en un mismo centro.
+  if(id==="xz"){g.position.set(0,0,0);g.rotation.set(0,0,0)}
+  if(id==="xy"){g.position.set(0,0,-4.15);g.rotation.set(Math.PI/2,0,0)}
+  if(id==="zy"){g.position.set(-4.15,0,0);g.rotation.set(0,0,Math.PI/2)}
+}
 function rebuild(){
- while(boardGroup.children.length)boardGroup.remove(boardGroup.children[0]);squareMeshes=[];pieceMeshes=[];
- const P=currentPlane();
- const matEdge=new THREE.LineBasicMaterial({color:P.edge,transparent:true,opacity:.6});
- for(let y=0;y<8;y++)for(let x=0;x<8;x++){
-   const geo=new THREE.BoxGeometry(.96,.08,.96);
-   const col=(x+y)%2?P.dark:P.light;
-   const mat=new THREE.MeshStandardMaterial({color:col,transparent:P.id!=="xz",opacity:P.id==="xz"?1:.72,roughness:.7});
-   const sq=new THREE.Mesh(geo,mat);sq.position.set(x-3.5,0,y-3.5);sq.userData={square:true,x,y};boardGroup.add(sq);squareMeshes.push(sq);
+ squareMeshes=[];pieceMeshes=[];
+ for(const P of PLANES){
+   const g=boardGroups[P.id];
+   while(g.children.length)g.remove(g.children[0]);
+   boardTransform(P.id,g);
+   const activePlane=P.id===currentPlane().id;
+   const matEdge=new THREE.LineBasicMaterial({color:P.edge,transparent:true,opacity:activePlane?1:.34});
+   for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+     const geo=new THREE.BoxGeometry(.96,.07,.96);
+     const col=(x+y)%2?P.dark:P.light;
+     const baseOpacity=P.id==="xz"?.82:.48;
+     const mat=new THREE.MeshStandardMaterial({
+       color:col,transparent:true,opacity:activePlane?Math.min(1,baseOpacity+.18):baseOpacity,
+       roughness:.68,depthWrite:false
+     });
+     const sq=new THREE.Mesh(geo,mat);
+     sq.position.set(x-3.5,0,y-3.5);
+     sq.userData={square:true,x,y,plane:P.id};
+     g.add(sq);squareMeshes.push(sq);
+   }
+   const frameGeo=new THREE.BoxGeometry(8.15,.04,8.15);
+   const frame=new THREE.LineSegments(new THREE.EdgesGeometry(frameGeo),matEdge);
+   frame.position.y=-.01;g.add(frame);
+   pieces.filter(p=>p.alive).forEach(p=>{
+     const [x,y]=p.pos[P.id];
+     const chosen=selected&&selected.id===p.id;
+     const spr=makeTextSprite(
+       p.color==="w"?names[p.type]:blackNames[p.type],
+       chosen?"#ffe66d":(p.color==="w"?"#ffffff":"#ff5a70")
+     );
+     spr.position.set(x-3.5,.50,y-3.5);
+     spr.scale.multiplyScalar(activePlane?1:.82);
+     spr.material.opacity=activePlane?1:.55;
+     spr.userData={pieceId:p.id,plane:P.id};
+     g.add(spr);pieceMeshes.push(spr);
+   });
  }
- const frameGeo=new THREE.BoxGeometry(8.15,.04,8.15);const edges=new THREE.EdgesGeometry(frameGeo);
- const frame=new THREE.LineSegments(edges,matEdge);frame.position.y=-.01;boardGroup.add(frame);
- const pl=P.id;
- pieces.filter(p=>p.alive).forEach(p=>{
-   const [x,y]=p.pos[pl];
-   const chosen=selected&&selected.id===p.id;
-   const spr=makeTextSprite(p.color==="w"?names[p.type]:blackNames[p.type],chosen?"#ffe66d":(p.color==="w"?"#ffffff":"#ff5a70"));
-   spr.position.set(x-3.5,.52,y-3.5);spr.userData={pieceId:p.id};boardGroup.add(spr);pieceMeshes.push(spr);
- });
 }
-const views=[
- {pos:new THREE.Vector3(0,10.8,8.7),look:new THREE.Vector3(0,0,0)},
- {pos:new THREE.Vector3(10.8,1.0,0),look:new THREE.Vector3(0,0,0)},
- {pos:new THREE.Vector3(0,1.0,10.8),look:new THREE.Vector3(0,0,0)}
+const focusAngles=[
+ {theta:.58,phi:.82},      // XZ
+ {theta:1.62,phi:1.34},    // ZY rojo
+ {theta:.03,phi:1.34}      // XY azul
 ];
-let fromPos=new THREE.Vector3(),toPos=new THREE.Vector3(),camStart=0;
+let camRadius=16.2,camTheta=.58,camPhi=.82;
+let targetTheta=camTheta,targetPhi=camPhi,autoCam=false;
+function setOrbit(){
+ const x=camRadius*Math.sin(camPhi)*Math.sin(camTheta);
+ const y=camRadius*Math.cos(camPhi);
+ const z=camRadius*Math.sin(camPhi)*Math.cos(camTheta);
+ camera.position.set(x,y,z);camera.lookAt(0,0,0);
+}
 function animateCamera(){
- fromPos.copy(camera.position);toPos.copy(views[phase].pos);camStart=performance.now();camT=0;
+ targetTheta=focusAngles[phase].theta;targetPhi=focusAngles[phase].phi;autoCam=true;
 }
-function updateCam(now){
- if(camT<1){camT=Math.min(1,(now-camStart)/650);const q=camT<.5?2*camT*camT:1-Math.pow(-2*camT+2,2)/2;camera.position.lerpVectors(fromPos,toPos,q);camera.lookAt(0,0,0)}
+function updateCam(){
+ if(autoCam){
+   let d=targetTheta-camTheta;
+   while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
+   camTheta+=d*.11;camPhi+=(targetPhi-camPhi)*.11;
+   if(Math.abs(d)<.006&&Math.abs(targetPhi-camPhi)<.006)autoCam=false;
+ }
+ setOrbit();
 }
+let drag=false,moved=false,lastX=0,lastY=0,downX=0,downY=0;
+canvas.addEventListener("pointerdown",e=>{
+ drag=true;moved=false;lastX=downX=e.clientX;lastY=downY=e.clientY;
+ canvas.setPointerCapture&&canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove",e=>{
+ if(!drag)return;
+ const dx=e.clientX-lastX,dy=e.clientY-lastY;
+ if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>7)moved=true;
+ if(moved){
+   autoCam=false;
+   camTheta-=dx*.009;
+   camPhi=Math.max(.18,Math.min(Math.PI-.18,camPhi-dy*.009));
+   setOrbit();
+ }
+ lastX=e.clientX;lastY=e.clientY;
+});
+canvas.addEventListener("pointerup",e=>{
+ if(!drag)return;drag=false;
+ if(!moved)pick(e);
+});
+canvas.addEventListener("wheel",e=>{
+ camRadius=Math.max(10,Math.min(25,camRadius+e.deltaY*.01));setOrbit();
+},{passive:true});
 function pick(e){
  if(!game||paused||camT<.98)return;
  const r=canvas.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;
  ray.setFromCamera(mouse,camera);
- let hits=ray.intersectObjects(pieceMeshes,false);
+ let hits=ray.intersectObjects(pieceMeshes.filter(m=>m.userData.plane===currentPlane().id),false);
  if(hits.length&&!selected){const p=pieces.find(q=>q.id===hits[0].object.userData.pieceId);if(p&&p.color===turn){selected=p;setMsg("Pieza elegida. Muévela en "+currentPlane().name+".");rebuild();return}}
- hits=ray.intersectObjects(squareMeshes,false);if(hits.length)doMove(hits[0].object.userData.x,hits[0].object.userData.y);
+ hits=ray.intersectObjects(squareMeshes.filter(m=>m.userData.plane===currentPlane().id),false);
+ if(hits.length)doMove(hits[0].object.userData.x,hits[0].object.userData.y);
 }
-canvas.addEventListener("pointerup",pick);
 document.getElementById("skip").onclick=skip;
 document.getElementById("pause").onclick=()=>{if(!game)return;paused=!paused;document.getElementById("pause").textContent=paused?"▶":"Ⅱ";setMsg(paused?"PAUSA":"Continúa la partida.")};
 
@@ -207,14 +277,14 @@ function applause(){for(let i=0;i<18;i++){const t=i*.025;tone(500+Math.random()*
 function victory(){[523,659,784,1047,784,1047].forEach((f,i)=>tone(f,i*.18,.28,"triangle",.12))}
 function finish(w){game=false;victory();document.getElementById("winner").textContent="GANAN "+w;document.getElementById("over").classList.remove("hidden")}
 function reset(){
- initPieces();phase=0;turn="w";selected=null;game=true;paused=false;camera.position.copy(views[0].pos);camera.lookAt(0,0,0);camT=1;rebuild();updateHUD();setMsg("Selecciona una pieza blanca.");
+ initPieces();phase=0;turn="w";selected=null;game=true;paused=false;camRadius=16.2;camTheta=.58;camPhi=.82;targetTheta=camTheta;targetPhi=camPhi;autoCam=false;setOrbit();rebuild();updateHUD();setMsg("Selecciona una pieza blanca.");
 }
 document.getElementById("startBtn").onclick=()=>{audio();document.getElementById("start").classList.add("hidden");reset()};
 document.getElementById("again").onclick=()=>{document.getElementById("over").classList.add("hidden");reset()};
 function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
 addEventListener("resize",resize);resize();
-camera.position.copy(views[0].pos);camera.lookAt(0,0,0);initPieces();rebuild();updateHUD();
-function loop(now){requestAnimationFrame(loop);updateCam(now);renderer.render(scene,camera)}requestAnimationFrame(loop);
+setOrbit();initPieces();rebuild();updateHUD();
+function loop(){requestAnimationFrame(loop);updateCam();renderer.render(scene,camera)}requestAnimationFrame(loop);
 })();
 </script>
 </body></html>
