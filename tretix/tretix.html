@@ -42,20 +42,21 @@
   #title{position:absolute; left:50%; top:6px; transform:translateX(-50%); text-align:center; font-family:'Orbitron',sans-serif; font-weight:900; font-size:22px; letter-spacing:6px; color:#fff; text-shadow:0 0 8px var(--neon-cyan),0 0 18px var(--neon-mag); pointer-events:none;}
   #title small{display:block; font-size:8px; letter-spacing:3px; color:var(--neon-yel); text-shadow:0 0 6px var(--neon-yel); font-family:'Share Tech Mono',monospace;}
 
-  /* ---- camera view buttons ---- */
-  #camPad{position:fixed; right:10px; top:96px; z-index:10; display:grid; grid-template-columns:repeat(3,34px); gap:4px;}
-  #camPad button{width:34px; height:34px; background:rgba(10,8,20,.6); border:1px solid var(--neon-mag); color:var(--neon-mag); font-family:'Orbitron',sans-serif; font-size:9px; border-radius:6px; text-shadow:0 0 4px var(--neon-mag);}
-  #camPad button:active{background:rgba(255,47,208,.3);}
-
-  /* ---- movement dpad ---- */
-  #movePad{position:fixed; left:10px; bottom:16px; z-index:10; display:grid; grid-template-columns:repeat(3,46px); grid-template-rows:repeat(3,46px); gap:4px;}
-  #movePad button{background:rgba(10,8,20,.6); border:1px solid var(--neon-cyan); color:var(--neon-cyan); border-radius:8px; font-size:18px; text-shadow:0 0 5px var(--neon-cyan);}
-  #movePad button:active{background:rgba(0,255,252,.3);}
-  #rotBtn{position:fixed; right:10px; bottom:16px; z-index:10; width:64px; height:64px; border-radius:50%; background:rgba(10,8,20,.65); border:2px solid var(--neon-yel); color:var(--neon-yel); font-family:'Orbitron',sans-serif; font-size:10px; text-shadow:0 0 6px var(--neon-yel); box-shadow:0 0 14px rgba(246,255,47,.4);}
-  #dropBtn{position:fixed; right:82px; bottom:24px; z-index:10; width:52px; height:52px; border-radius:50%; background:rgba(10,8,20,.65); border:2px solid var(--neon-grn); color:var(--neon-grn); font-family:'Orbitron',sans-serif; font-size:9px; text-shadow:0 0 6px var(--neon-grn);}
-  #muteBtn{position:fixed; left:10px; top:96px; z-index:10; width:34px; height:34px; background:rgba(10,8,20,.6); border:1px solid var(--neon-grn); color:var(--neon-grn); border-radius:6px; font-size:14px;}
-
-  #hint{position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:9; color:rgba(255,255,255,.55); font-size:10px; letter-spacing:1px; text-align:center; pointer-events:none; width:90%;}
+  /* ---- controles simplificados ---- */
+  #movePad{position:fixed;left:10px;bottom:16px;z-index:10;display:grid;grid-template-columns:repeat(3,50px);grid-template-rows:repeat(3,50px);gap:5px}
+  #movePad button{background:rgba(10,8,20,.72);border:2px solid currentColor;border-radius:9px;font-size:22px;font-weight:900;box-shadow:0 0 10px currentColor}
+  #movePad button:active,.actionBtn:active{transform:scale(.92);background:rgba(255,255,255,.12)}
+  #movePad [data-m="fz"]{color:#ff3b3b}
+  #movePad [data-m="bz"]{color:#2f7bff}
+  #movePad [data-m="nx"]{color:#2fff8f}
+  #movePad [data-m="px"]{color:#f6ff2f}
+  #actionPad{position:fixed;right:10px;bottom:16px;z-index:10;display:flex;gap:9px;align-items:flex-end}
+  .actionBtn{width:58px;height:58px;border-radius:50%;background:rgba(10,8,20,.72);font-family:'Orbitron',sans-serif;font-weight:900;font-size:21px}
+  #rotBackBtn,#rotFrontBtn{border:2px solid #fff;color:#fff;text-shadow:0 0 7px #fff;box-shadow:0 0 12px rgba(255,255,255,.3)}
+  #dropBtn{border:2px solid var(--neon-purp);color:var(--neon-purp);text-shadow:0 0 7px var(--neon-purp);box-shadow:0 0 12px rgba(165,47,255,.4)}
+  #pauseBtn{position:fixed;right:10px;top:74px;z-index:12;width:38px;height:38px;border-radius:8px;background:rgba(10,8,20,.65);border:1px solid #fff;color:#fff;font-size:16px}
+  #muteBtn{position:fixed;left:10px;top:96px;z-index:10;width:34px;height:34px;background:rgba(10,8,20,.6);border:1px solid var(--neon-grn);color:var(--neon-grn);border-radius:6px;font-size:14px}
+  #hint{position:fixed;bottom:86px;left:50%;transform:translateX(-50%);z-index:9;color:rgba(255,255,255,.55);font-size:9px;letter-spacing:1px;text-align:center;pointer-events:none;width:78%}
 
   /* ---- overlays ---- */
   .overlay{position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:radial-gradient(ellipse at center, rgba(20,5,35,.92), rgba(0,0,0,.97)); gap:14px; padding:20px;}
@@ -96,22 +97,19 @@
   <div class="val" id="linesVal" style="font-size:16px;">0</div>
 </div>
 
-<button id="muteBtn">♪</button>
-<div id="camPad">
-  <div></div><button data-v="top">TOP</button><div></div>
-  <button data-v="left">◀</button><button data-v="front">FRT</button><button data-v="right">▶</button>
-  <div></div><button data-v="back">BCK</button><div></div>
-</div>
-
-<div id="hint">Arrastra la pantalla: girar cámara · Toca la pieza: rotarla · Flechas/D-Pad: mover</div>
-
+<button id="muteBtn" title="Sonido">♪</button>
+<button id="pauseBtn" title="Pausa">Ⅱ</button>
+<div id="hint">Arrastra: girar cámara · Colores: mover · Blanco: rotar · Morado: bajar rápido</div>
 <div id="movePad">
-  <div></div><button data-m="fz">▲</button><div></div>
-  <button data-m="nx">◀</button><div></div><button data-m="px">▶</button>
-  <div></div><button data-m="bz">▼</button><div></div>
+  <div></div><button data-m="fz" aria-label="Hacia rojo">▲</button><div></div>
+  <button data-m="nx" aria-label="Hacia verde">◀</button><div></div><button data-m="px" aria-label="Hacia amarillo">▶</button>
+  <div></div><button data-m="bz" aria-label="Hacia azul">▼</button><div></div>
 </div>
-<button id="dropBtn">DROP</button>
-<button id="rotBtn">ROTAR</button>
+<div id="actionPad">
+  <button class="actionBtn" id="rotBackBtn" aria-label="Rotar atrás">↶</button>
+  <button class="actionBtn" id="dropBtn" aria-label="Bajar rápido">▼</button>
+  <button class="actionBtn" id="rotFrontBtn" aria-label="Rotar delante">↷</button>
+</div>
 
 <!-- START -->
 <div class="overlay" id="startScreen">
@@ -258,6 +256,22 @@ const wellLines=new THREE.LineSegments(wellEdges, wellMat);
 wellLines.position.set(GX/2-0.5, GY/2-0.5, GZ/2-0.5);
 scene.add(wellLines);
 
+  // PAREDES-BRÚJULA: pares opuestos rojo/azul y verde/amarillo.
+  const dirWalls=new THREE.Group(); scene.add(dirWalls);
+  function addDirectionWall(w,h,color,x,y,z,ry){
+    const geo=new THREE.PlaneGeometry(w,h);
+    const mat=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.115,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
+    const mesh=new THREE.Mesh(geo,mat); mesh.position.set(x,y,z); mesh.rotation.y=ry||0; dirWalls.add(mesh);
+    const edge=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color,transparent:true,opacity:.72}));
+    mesh.add(edge);
+  }
+  const wallCY=GY/2-.5,wallCX=GX/2-.5,wallCZ=GZ/2-.5;
+  addDirectionWall(GX,GY,0xff3b3b,wallCX,wallCY,-.5,0);          // ROJO z-
+  addDirectionWall(GX,GY,0x2f7bff,wallCX,wallCY,GZ-.5,0);       // AZUL z+
+  addDirectionWall(GZ,GY,0x2fff8f,-.5,wallCY,wallCZ,Math.PI/2); // VERDE x-
+  addDirectionWall(GZ,GY,0xf6ff2f,GX-.5,wallCY,wallCZ,Math.PI/2);// AMARILLO x+
+
+
 // floor grid (synthwave floor) — fades in with transition
 const floorGeo=new THREE.PlaneGeometry(60,60,30,30);
 const floorMat=new THREE.MeshBasicMaterial({color:0xff2fd0, wireframe:true, transparent:true, opacity:0});
@@ -364,26 +378,30 @@ function movePiece(dx,dz){
     active.x=nx; active.z=nz;
   }
 }
-function rotatePiece(){
-  if(!active||!gameRunning) return;
-  const orients=ORIENTATIONS[active.name];
-  const nextIndex=(active.orientIndex+1)%orients.length;
-  const nextOff=orients[nextIndex];
+function tryRotationOffsets(nextOff){
   const kicks=[0,-1,1,-2,2];
-  for(const kx of kicks){
-    for(const kz of kicks){
-      if(validPos(active, active.x+kx, active.y, active.z+kz, nextOff)){
-        active.orientIndex=nextIndex;
-        active.offsets=nextOff;
-        active.x+=kx; active.z+=kz;
-        buildPieceMeshes(active);
-        pulseRotateFX();
-        return;
-      }
+  for(const kx of kicks) for(const kz of kicks){
+    if(validPos(active,active.x+kx,active.y,active.z+kz,nextOff)){
+      active.offsets=nextOff; active.x+=kx; active.z+=kz;
+      const k=keyOff(nextOff);
+      const idx=ORIENTATIONS[active.name].findIndex(o=>keyOff(o)===k);
+      if(idx>=0) active.orientIndex=idx;
+      buildPieceMeshes(active); pulseRotateFX(); return true;
     }
   }
-  // no cabe: pequeño feedback pero no rota
+  return false;
 }
+function rotatePieceCamera(direction){
+  if(!active||!gameRunning)return;
+  const viewX=center.x-camera.position.x, viewZ=center.z-camera.position.z;
+  const axis=Math.abs(viewX)>Math.abs(viewZ)?'z':'x';
+  let next=active.offsets.map(o=>o.slice());
+  const turns=direction>0?1:3;
+  for(let i=0;i<turns;i++) next=rotAxis(next,axis);
+  next=normOff(next);
+  tryRotationOffsets(next);
+}
+function rotatePiece(){rotatePieceCamera(1);}
 
 function lockPiece(){
   if(!active) return;
@@ -531,16 +549,6 @@ canvas.addEventListener('touchmove', e=>{ onPointerMove(e); }, {passive:true});
 canvas.addEventListener('touchend', e=>{ onPointerUp(e); }, {passive:true});
 canvas.addEventListener('wheel', e=>{ camRadius=Math.min(28,Math.max(7,camRadius+e.deltaY*0.01)); updateCamera(); }, {passive:true});
 
-document.getElementById('camPad').addEventListener('click', e=>{
-  const v=e.target.dataset.v; if(!v) return;
-  if(v==='top'){ camPhi=0.18; camTheta=camTheta; }
-  else if(v==='front'){ camPhi=1.15; camTheta=0; }
-  else if(v==='right'){ camPhi=1.15; camTheta=Math.PI/2; }
-  else if(v==='back'){ camPhi=1.15; camTheta=Math.PI; }
-  else if(v==='left'){ camPhi=1.15; camTheta=-Math.PI/2; }
-  updateCamera();
-});
-
 document.getElementById('movePad').addEventListener('click', e=>{
   const m=e.target.dataset.m; if(!m) return;
   if(m==='nx') movePiece(-1,0);
@@ -548,8 +556,16 @@ document.getElementById('movePad').addEventListener('click', e=>{
   if(m==='fz') movePiece(0,-1);
   if(m==='bz') movePiece(0,1);
 });
-document.getElementById('rotBtn').addEventListener('click', rotatePiece);
-document.getElementById('dropBtn').addEventListener('click', hardDrop);
+document.getElementById('rotBackBtn').addEventListener('click',()=>rotatePieceCamera(-1));
+document.getElementById('rotFrontBtn').addEventListener('click',()=>rotatePieceCamera(1));
+document.getElementById('dropBtn').addEventListener('click',hardDrop);
+let paused=false;
+document.getElementById('pauseBtn').addEventListener('click',()=>{
+  if(gameOverFlag||winFlag)return;
+  paused=!paused; gameRunning=!paused;
+  document.getElementById('pauseBtn').textContent=paused?'▶':'Ⅱ';
+  if(paused)stopMusic();else startMusic();
+});
 
 window.addEventListener('keydown', e=>{
   if(!gameRunning) return;
@@ -730,7 +746,8 @@ function resetGame(){
   camTheta=Math.PI*0.28; camPhi=1.15; camRadius=15; updateCamera();
   if(active){ scene.remove(active.group); }
   active=spawnPiece();
-  gameOverFlag=false; winFlag=false; gameRunning=true;
+  gameOverFlag=false; winFlag=false; paused=false; gameRunning=true;
+  document.getElementById('pauseBtn').textContent='Ⅱ';
   updateHUD();
   startMusic();
 }
