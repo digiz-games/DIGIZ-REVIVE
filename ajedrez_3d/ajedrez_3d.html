@@ -41,7 +41,7 @@ button{padding:0 10px;min-height:44px}
 </div>
 <div id="msg">Selecciona una pieza blanca.</div>
 <div id="legend">X–Z blanco/negro<br>X–Y azul<br>Z–Y rojo</div>
-<div id="controls"><button id="skip">SALTAR PLANO</button><button id="pause">Ⅱ</button></div>
+<div id="controls"><button id="skip">SALTAR PLANO</button><button id="musicBtn" title="Música">♫</button><button id="pause">Ⅱ</button></div>
 
 <div class="overlay" id="start">
  <div class="panel">
@@ -204,6 +204,8 @@ function rebuild(){
    pieces.filter(p=>p.alive).forEach(p=>{
      const [x,y]=p.pos[P.id];
      const chosen=selected&&selected.id===p.id;
+     // XY azul = espejo frontal REAL del plano normal:
+     // se refleja la posición, pero el bando/color de la pieza NO cambia.
      const spr=makeTextSprite(
        p.color==="w"?names[p.type]:blackNames[p.type],
        chosen?"#ffe66d":(p.color==="w"?"#ffffff":"#111111")
@@ -277,19 +279,48 @@ function pick(e){
  if(hits.length)doMove(hits[0].object.userData.x,hits[0].object.userData.y);
 }
 document.getElementById("skip").onclick=skip;
-document.getElementById("pause").onclick=()=>{if(!game)return;paused=!paused;document.getElementById("pause").textContent=paused?"▶":"Ⅱ";setMsg(paused?"PAUSA":"Continúa la partida.")};
+document.getElementById("pause").onclick=()=>{if(!game)return;paused=!paused;document.getElementById("pause").textContent=paused?"▶":"Ⅱ";setMsg(paused?"PAUSA":"Continúa la partida.");if(paused)stopBgMusic();else if(musicEnabled)startBgMusic()};
+let musicEnabled=true;
+document.getElementById("musicBtn").onclick=()=>{
+ musicEnabled=!musicEnabled;
+ document.getElementById("musicBtn").textContent=musicEnabled?"♫":"×";
+ if(!musicEnabled)stopBgMusic();else if(game&&!paused)startBgMusic();
+};
 
 let ac=null;
 function audio(){if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume()}
 function tone(f,t,d,type="sine",v=.08){audio();const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,ac.currentTime+t);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+t+d);o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+d)}
+
+let musicTimer=null,musicStep=0;
+const MUSIC_NOTES=[220,261.63,329.63,392,329.63,261.63,246.94,293.66,369.99,440,369.99,293.66];
+function musicTick(){
+ if(!game||paused||!ac)return;
+ const f=MUSIC_NOTES[musicStep%MUSIC_NOTES.length];
+ // soft plucked lead
+ tone(f,0,.16,"triangle",.028);
+ // quiet lower note every other beat
+ if(musicStep%2===0) tone(f/2,0,.24,"sine",.018);
+ // little high answer every fourth beat
+ if(musicStep%4===3) tone(f*2,.08,.10,"triangle",.012);
+ musicStep++;
+}
+function startBgMusic(){
+ audio();
+ if(musicTimer)clearInterval(musicTimer);
+ musicStep=0;
+ musicTimer=setInterval(musicTick,260);
+}
+function stopBgMusic(){
+ if(musicTimer){clearInterval(musicTimer);musicTimer=null;}
+}
 function applause(){for(let i=0;i<18;i++){const t=i*.025;tone(500+Math.random()*900,t,.07,"square",.025)}tone(880,.05,.18,"sine",.08)}
 function victory(){[523,659,784,1047,784,1047].forEach((f,i)=>tone(f,i*.18,.28,"triangle",.12))}
-function finish(w){game=false;victory();document.getElementById("winner").textContent="GANAN "+w;document.getElementById("over").classList.remove("hidden")}
+function finish(w){game=false;stopBgMusic();victory();document.getElementById("winner").textContent="GANAN "+w;document.getElementById("over").classList.remove("hidden")}
 function reset(){
  initPieces();phase=0;turn="w";selected=null;game=true;paused=false;camRadius=18.5;camTheta=.72;camPhi=.92;targetTheta=camTheta;targetPhi=camPhi;autoCam=false;setOrbit();rebuild();updateHUD();setMsg("Selecciona una pieza blanca.");
 }
-document.getElementById("startBtn").onclick=()=>{audio();document.getElementById("start").classList.add("hidden");reset()};
-document.getElementById("again").onclick=()=>{document.getElementById("over").classList.add("hidden");reset()};
+document.getElementById("startBtn").onclick=()=>{audio();document.getElementById("start").classList.add("hidden");reset();if(musicEnabled)startBgMusic()};
+document.getElementById("again").onclick=()=>{document.getElementById("over").classList.add("hidden");reset();if(musicEnabled)startBgMusic()};
 function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
 addEventListener("resize",resize);resize();
 setOrbit();initPieces();rebuild();updateHUD();
