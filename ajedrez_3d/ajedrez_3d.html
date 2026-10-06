@@ -46,7 +46,7 @@ button{padding:0 10px;min-height:44px}
 <div class="overlay" id="start">
  <div class="panel">
   <div class="title">TRI-CHESS</div><div class="sub">PROTOTIPO 3D · 2 JUGADORES</div>
-  <div class="desc">Cada pieza existe simultáneamente en <b>tres planos visibles a la vez</b>. Elige una sola pieza por turno y muévela en X–Z, Z–Y y X–Y. <b>Arrastra con el dedo</b> para girar libremente la estructura 3D. La cámara enfoca cada plano al avanzar, pero tú puedes cambiar el ángulo antes de elegir la casilla. Una captura en cualquier tablero elimina esa pieza de los tres.</div>
+  <div class="desc">Cada pieza existe simultáneamente en <b>tres planos visibles a la vez</b>, unidos por una casilla clara en el origen cartesiano. Elige una sola pieza por turno y muévela en X–Z, Z–Y y X–Y. <b>Arrastra con el dedo</b> para girar libremente la estructura 3D. La cámara enfoca cada plano al avanzar, pero tú puedes cambiar el ángulo antes de elegir la casilla. Una captura en cualquier tablero elimina esa pieza de los tres.</div>
   <button class="start" id="startBtn">INICIAR</button>
  </div>
 </div>
@@ -184,14 +184,17 @@ function rebuild(){
    const matEdge=new THREE.LineBasicMaterial({color:P.edge,transparent:true,opacity:activePlane?1:.34});
    for(let y=0;y<8;y++)for(let x=0;x<8;x++){
      const geo=new THREE.BoxGeometry(.96,.07,.96);
-     const col=(x+y)%2?P.dark:P.light;
+     // El vértice cartesiano compartido (0,0) SIEMPRE nace en casilla clara.
+     // En XY conservamos esa paridad pero su lectura espacial es espejo frontal.
+     const col=((x+y)%2===0)?P.light:P.dark;
      const baseOpacity=P.id==="xz"?.72:.44;
      const mat=new THREE.MeshStandardMaterial({
        color:col,transparent:true,opacity:activePlane?Math.min(1,baseOpacity+.18):baseOpacity,
        roughness:.68,depthWrite:false
      });
      const sq=new THREE.Mesh(geo,mat);
-     sq.position.set(x-3.5,0,y-3.5);
+     const drawX=(P.id==="xy")?(7-x):x;
+     sq.position.set(drawX-3.5,0,y-3.5);
      sq.userData={square:true,x,y,plane:P.id};
      g.add(sq);squareMeshes.push(sq);
    }
@@ -205,7 +208,8 @@ function rebuild(){
        p.color==="w"?names[p.type]:blackNames[p.type],
        chosen?"#ffe66d":(p.color==="w"?"#ffffff":"#111111")
      );
-     spr.position.set(x-3.5,.50,y-3.5);
+     const drawPX=(P.id==="xy")?(7-x):x;
+     spr.position.set(drawPX-3.5,.50,y-3.5);
      spr.scale.multiplyScalar(activePlane?1:.82);
      spr.material.opacity=activePlane?1:.55;
      spr.userData={pieceId:p.id,plane:P.id};
