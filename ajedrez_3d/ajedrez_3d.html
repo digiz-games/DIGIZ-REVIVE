@@ -127,14 +127,43 @@ function capture(victim){
 function doMove(x,y){
  if(!game||paused)return;
  const pl=currentPlane().id;
+ const tapped=occupied(pl,x,y,-1);
+
  if(!selected){
-   const p=occupied(pl,x,y,-1);
-   if(p&&p.color===turn){selected=p;setMsg("Pieza elegida: "+p.type+" en "+currentPlane().name+". Haz una jugada legal.");rebuild()}
-   else setMsg("Debes seleccionar una pieza "+(turn==="w"?"blanca.":"negra."));
+   if(tapped&&tapped.color===turn){
+     selected=tapped;
+     setMsg("Pieza elegida: "+tapped.type+". Haz una jugada legal.");
+     rebuild();
+   }else setMsg("Debes seleccionar una pieza "+(turn==="w"?"blanca.":"negra."));
    return;
  }
- if(!legal(selected,pl,x,y)){setMsg("Movimiento inválido para esa pieza.");return}
- const victim=occupied(pl,x,y,selected.id);if(victim)capture(victim);
+
+ // Otra pieza propia: cambia selección inmediatamente.
+ if(tapped&&tapped.color===turn&&tapped.id!==selected.id){
+   selected=tapped;
+   setMsg("Selección cambiada. Haz una jugada legal.");
+   rebuild();
+   return;
+ }
+
+ // Misma pieza: cancelar selección.
+ if(tapped&&tapped.id===selected.id){
+   selected=null;
+   setMsg("Selección cancelada. Elige otra pieza.");
+   rebuild();
+   return;
+ }
+
+ // Destino inválido: avisar y devolver el control a selección.
+ if(!legal(selected,pl,x,y)){
+   selected=null;
+   setMsg("Movimiento inválido. Elige nuevamente una pieza con movimiento válido.");
+   rebuild();
+   return;
+ }
+
+ const victim=occupied(pl,x,y,selected.id);
+ if(victim)capture(victim);
  selected.pos[pl]=[x,y];
  if(game)advancePlane();
 }
@@ -258,7 +287,10 @@ function pick(e){
  const r=canvas.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;
  ray.setFromCamera(mouse,camera);
  let hits=ray.intersectObjects(pieceMeshes.filter(m=>m.userData.plane===currentPlane().id),false);
- if(hits.length&&!selected){const p=pieces.find(q=>q.id===hits[0].object.userData.pieceId);if(p&&p.color===turn){selected=p;setMsg("Pieza elegida en "+currentPlane().name+". Haz una jugada legal.");rebuild();return}}
+ if(hits.length){
+   const p=pieces.find(q=>q.id===hits[0].object.userData.pieceId);
+   if(p){const [px,py]=p.pos[currentPlane().id];doMove(px,py);return}
+ }
  hits=ray.intersectObjects(squareMeshes.filter(m=>m.userData.plane===currentPlane().id),false);
  if(hits.length)doMove(hits[0].object.userData.x,hits[0].object.userData.y);
 }
