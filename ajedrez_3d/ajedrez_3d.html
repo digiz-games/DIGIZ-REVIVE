@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>TRI-CHESS 3D — Prototype</title>
+<style>
+:root{--bg:#05070c;--cyan:#4cf5ff;--red:#ff4d5d;--blue:#4d8dff;--gold:#ffe66d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#03050a;color:#fff;font-family:system-ui,Segoe UI,sans-serif}
+#app{position:fixed;inset:0}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#hud{position:fixed;left:0;right:0;top:0;z-index:10;padding:10px;pointer-events:none;display:flex;justify-content:space-between;gap:8px}
+.card{background:rgba(3,7,16,.76);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:8px 12px;backdrop-filter:blur(8px);box-shadow:0 0 18px rgba(76,245,255,.12)}
+#turn{font-weight:900;letter-spacing:1px}.small{font-size:11px;opacity:.72}.big{font-size:15px}
+#phase{text-align:right}
+#controls{position:fixed;z-index:12;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:9px;align-items:center}
+button{min-height:48px;border-radius:13px;padding:0 16px;background:rgba(5,9,18,.86);color:#fff;border:1px solid rgba(255,255,255,.35);font-weight:800;letter-spacing:.5px}
+button:active{transform:scale(.96)}
+#skip{border-color:var(--gold);color:var(--gold);box-shadow:0 0 14px rgba(255,230,109,.18)}
+#pause{width:48px;padding:0}
+#msg{position:fixed;z-index:11;left:50%;top:86px;transform:translateX(-50%);max-width:92vw;text-align:center;padding:8px 13px;border-radius:10px;background:rgba(0,0,0,.58);font-size:12px;pointer-events:none}
+#legend{position:fixed;z-index:9;right:10px;bottom:78px;font-size:10px;line-height:1.6;text-align:right;opacity:.75;pointer-events:none}
+.overlay{position:fixed;inset:0;z-index:30;background:radial-gradient(circle at center,#101b35 0,#03050a 68%);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+.panel{max-width:520px}.title{font-size:clamp(32px,10vw,66px);font-weight:1000;letter-spacing:5px;text-shadow:0 0 18px var(--cyan)}.sub{color:var(--cyan);letter-spacing:3px;font-size:12px}.desc{line-height:1.55;opacity:.8;font-size:13px;margin:20px 0}.start{border:2px solid var(--cyan);color:var(--cyan);font-size:15px;padding:0 24px;box-shadow:0 0 20px rgba(76,245,255,.25)}.hidden{display:none}
+#winner{font-size:30px;font-weight:1000;margin:8px 0}
+@media(max-width:520px){.card{padding:7px 9px}.big{font-size:13px}#msg{top:82px}button{padding:0 12px}}
+</style>
+</head>
+<body>
+<div id="app"><canvas id="c"></canvas></div>
+<div id="hud">
+ <div class="card"><div class="small">TURNO</div><div class="big" id="turn">BLANCAS</div></div>
+ <div class="card" id="phase"><div class="small">PLANO</div><div class="big" id="planeName">X–Z · CLÁSICO</div></div>
+</div>
+<div id="msg">Selecciona una pieza blanca.</div>
+<div id="legend">X–Z blanco/negro<br>X–Y azul<br>Z–Y rojo</div>
+<div id="controls"><button id="skip">SALTAR PLANO</button><button id="pause">Ⅱ</button></div>
+
+<div class="overlay" id="start">
+ <div class="panel">
+  <div class="title">TRI-CHESS</div><div class="sub">PROTOTIPO 3D · 2 JUGADORES</div>
+  <div class="desc">Cada pieza existe simultáneamente en tres planos. Elige <b>una sola pieza por turno</b> y muévela, si quieres, en X–Z, X–Y y Z–Y. La cámara gira automáticamente al siguiente plano. Una captura en cualquier tablero elimina esa pieza de los tres.</div>
+  <button class="start" id="startBtn">INICIAR</button>
+ </div>
+</div>
+<div class="overlay hidden" id="over">
+ <div class="panel"><div class="sub">PARTIDA TERMINADA</div><div id="winner">—</div><button class="start" id="again">JUGAR OTRA VEZ</button></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+"use strict";
+const canvas=document.getElementById("c");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x03050a);
+const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,100);
+scene.add(new THREE.AmbientLight(0xffffff,.82));
+const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(7,10,8);scene.add(dl);
+
+const PLANES=[
+ {id:"xz",name:"X–Z · CLÁSICO",dark:0x17191f,light:0xe7e7df,edge:0xffffff},
+ {id:"zy",name:"Z–Y · ROJO",dark:0x420b12,light:0xff6876,edge:0xff4d5d},
+ {id:"xy",name:"X–Y · AZUL",dark:0x071d4c,light:0x69a9ff,edge:0x4d8dff}
+];
+let phase=0,turn="w",selected=null,game=false,paused=false,camT=1;
+let boardGroup=new THREE.Group();scene.add(boardGroup);
+let squareMeshes=[],pieceMeshes=[];
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
+const names={K:"♔",Q:"♕",R:"♖",B:"♗",N:"♘",P:"♙"};
+const blackNames={K:"♚",Q:"♛",R:"♜",B:"♝",N:"♞",P:"♟"};
+let pieces=[];
+
+function initPieces(){
+ pieces=[];let id=0;
+ const back=["R","N","B","Q","K","B","N","R"];
+ for(const color of ["w","b"]){
+   const rank=color==="w"?0:7,pawn=color==="w"?1:6;
+   for(let x=0;x<8;x++){
+     const p1={id:id++,type:back[x],color,alive:true,pos:{xz:[x,rank],xy:[x,rank],zy:[x,rank]}};
+     const p2={id:id++,type:"P",color,alive:true,pos:{xz:[x,pawn],xy:[x,pawn],zy:[x,pawn]}};
+     pieces.push(p1,p2);
+   }
+ }
+}
+function currentPlane(){return PLANES[phase]}
+function occupied(pl,x,y,exclude){
+ return pieces.find(p=>p.alive&&p.id!==exclude&&p.pos[pl][0]===x&&p.pos[pl][1]===y)||null;
+}
+function clearPath(pl,p,tx,ty){
+ let [x,y]=p.pos[pl],dx=Math.sign(tx-x),dy=Math.sign(ty-y);x+=dx;y+=dy;
+ while(x!==tx||y!==ty){if(occupied(pl,x,y,p.id))return false;x+=dx;y+=dy}return true;
+}
+function legal(p,pl,tx,ty){
+ if(!p||!p.alive||tx<0||tx>7||ty<0||ty>7)return false;
+ const [x,y]=p.pos[pl],dx=tx-x,dy=ty-y,ax=Math.abs(dx),ay=Math.abs(dy);
+ if(dx===0&&dy===0)return false;
+ const target=occupied(pl,tx,ty,p.id);if(target&&target.color===p.color)return false;
+ if(p.type==="K")return ax<=1&&ay<=1;
+ if(p.type==="Q")return (dx===0||dy===0||ax===ay)&&clearPath(pl,p,tx,ty);
+ if(p.type==="R")return (dx===0||dy===0)&&clearPath(pl,p,tx,ty);
+ if(p.type==="B")return ax===ay&&clearPath(pl,p,tx,ty);
+ if(p.type==="N")return (ax===1&&ay===2)||(ax===2&&ay===1);
+ if(p.type==="P"){
+   const dir=p.color==="w"?1:-1,start=p.color==="w"?1:6;
+   if(dx===0&&!target&&dy===dir)return true;
+   if(dx===0&&!target&&y===start&&dy===2*dir&&!occupied(pl,x,y+dir,p.id))return true;
+   if(ax===1&&dy===dir&&target&&target.color!==p.color)return true;
+ }
+ return false;
+}
+function capture(victim){
+ victim.alive=false;
+ applause();
+ if(victim.type==="K"){finish(turn==="w"?"BLANCAS":"NEGRAS")}
+}
+function doMove(x,y){
+ if(!game||paused)return;
+ const pl=currentPlane().id;
+ if(!selected){
+   const p=occupied(pl,x,y,-1);
+   if(p&&p.color===turn){selected=p;setMsg("Pieza elegida: "+p.type+". Muévela en "+currentPlane().name+".");rebuild()}
+   else setMsg("Debes seleccionar una pieza "+(turn==="w"?"blanca.":"negra."));
+   return;
+ }
+ if(!legal(selected,pl,x,y)){setMsg("Movimiento inválido para esa pieza.");return}
+ const victim=occupied(pl,x,y,selected.id);if(victim)capture(victim);
+ selected.pos[pl]=[x,y];
+ if(game)advancePlane();
+}
+function advancePlane(){
+ phase++;
+ if(phase>=3){
+   phase=0;turn=turn==="w"?"b":"w";selected=null;
+   setMsg("Turno de "+(turn==="w"?"BLANCAS":"NEGRAS")+". Selecciona una pieza.");
+ }else setMsg("Ahora "+currentPlane().name+". "+(selected?"Mueve la misma pieza o pulsa SALTAR.":""));
+ animateCamera();updateHUD();rebuild();
+}
+function skip(){
+ if(!game||paused)return;
+ if(!selected){setMsg("Primero debes elegir la pieza que usarás este turno.");return}
+ advancePlane();
+}
+function setMsg(t){document.getElementById("msg").textContent=t}
+function updateHUD(){
+ document.getElementById("turn").textContent=turn==="w"?"BLANCAS":"NEGRAS";
+ document.getElementById("planeName").textContent=currentPlane().name;
+ document.getElementById("phase").style.borderColor="#"+currentPlane().edge.toString(16).padStart(6,"0");
+}
+function makeTextSprite(text,color){
+ const cv=document.createElement("canvas");cv.width=256;cv.height=256;const c=cv.getContext("2d");
+ c.clearRect(0,0,256,256);c.textAlign="center";c.textBaseline="middle";c.font="190px serif";
+ c.fillStyle=color;c.shadowColor=color;c.shadowBlur=18;c.fillText(text,128,135);
+ const tex=new THREE.CanvasTexture(cv);const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true});
+ const s=new THREE.Sprite(mat);s.scale.set(.78,.78,.78);return s;
+}
+function rebuild(){
+ while(boardGroup.children.length)boardGroup.remove(boardGroup.children[0]);squareMeshes=[];pieceMeshes=[];
+ const P=currentPlane();
+ const matEdge=new THREE.LineBasicMaterial({color:P.edge,transparent:true,opacity:.6});
+ for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+   const geo=new THREE.BoxGeometry(.96,.08,.96);
+   const col=(x+y)%2?P.dark:P.light;
+   const mat=new THREE.MeshStandardMaterial({color:col,transparent:P.id!=="xz",opacity:P.id==="xz"?1:.72,roughness:.7});
+   const sq=new THREE.Mesh(geo,mat);sq.position.set(x-3.5,0,y-3.5);sq.userData={square:true,x,y};boardGroup.add(sq);squareMeshes.push(sq);
+ }
+ const frameGeo=new THREE.BoxGeometry(8.15,.04,8.15);const edges=new THREE.EdgesGeometry(frameGeo);
+ const frame=new THREE.LineSegments(edges,matEdge);frame.position.y=-.01;boardGroup.add(frame);
+ const pl=P.id;
+ pieces.filter(p=>p.alive).forEach(p=>{
+   const [x,y]=p.pos[pl];
+   const chosen=selected&&selected.id===p.id;
+   const spr=makeTextSprite(p.color==="w"?names[p.type]:blackNames[p.type],chosen?"#ffe66d":(p.color==="w"?"#ffffff":"#ff5a70"));
+   spr.position.set(x-3.5,.52,y-3.5);spr.userData={pieceId:p.id};boardGroup.add(spr);pieceMeshes.push(spr);
+ });
+}
+const views=[
+ {pos:new THREE.Vector3(0,10.8,8.7),look:new THREE.Vector3(0,0,0)},
+ {pos:new THREE.Vector3(10.8,1.0,0),look:new THREE.Vector3(0,0,0)},
+ {pos:new THREE.Vector3(0,1.0,10.8),look:new THREE.Vector3(0,0,0)}
+];
+let fromPos=new THREE.Vector3(),toPos=new THREE.Vector3(),camStart=0;
+function animateCamera(){
+ fromPos.copy(camera.position);toPos.copy(views[phase].pos);camStart=performance.now();camT=0;
+}
+function updateCam(now){
+ if(camT<1){camT=Math.min(1,(now-camStart)/650);const q=camT<.5?2*camT*camT:1-Math.pow(-2*camT+2,2)/2;camera.position.lerpVectors(fromPos,toPos,q);camera.lookAt(0,0,0)}
+}
+function pick(e){
+ if(!game||paused||camT<.98)return;
+ const r=canvas.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+ ray.setFromCamera(mouse,camera);
+ let hits=ray.intersectObjects(pieceMeshes,false);
+ if(hits.length&&!selected){const p=pieces.find(q=>q.id===hits[0].object.userData.pieceId);if(p&&p.color===turn){selected=p;setMsg("Pieza elegida. Muévela en "+currentPlane().name+".");rebuild();return}}
+ hits=ray.intersectObjects(squareMeshes,false);if(hits.length)doMove(hits[0].object.userData.x,hits[0].object.userData.y);
+}
+canvas.addEventListener("pointerup",pick);
+document.getElementById("skip").onclick=skip;
+document.getElementById("pause").onclick=()=>{if(!game)return;paused=!paused;document.getElementById("pause").textContent=paused?"▶":"Ⅱ";setMsg(paused?"PAUSA":"Continúa la partida.")};
+
+let ac=null;
+function audio(){if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume()}
+function tone(f,t,d,type="sine",v=.08){audio();const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,ac.currentTime+t);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+t+d);o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+d)}
+function applause(){for(let i=0;i<18;i++){const t=i*.025;tone(500+Math.random()*900,t,.07,"square",.025)}tone(880,.05,.18,"sine",.08)}
+function victory(){[523,659,784,1047,784,1047].forEach((f,i)=>tone(f,i*.18,.28,"triangle",.12))}
+function finish(w){game=false;victory();document.getElementById("winner").textContent="GANAN "+w;document.getElementById("over").classList.remove("hidden")}
+function reset(){
+ initPieces();phase=0;turn="w";selected=null;game=true;paused=false;camera.position.copy(views[0].pos);camera.lookAt(0,0,0);camT=1;rebuild();updateHUD();setMsg("Selecciona una pieza blanca.");
+}
+document.getElementById("startBtn").onclick=()=>{audio();document.getElementById("start").classList.add("hidden");reset()};
+document.getElementById("again").onclick=()=>{document.getElementById("over").classList.add("hidden");reset()};
+function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
+addEventListener("resize",resize);resize();
+camera.position.copy(views[0].pos);camera.lookAt(0,0,0);initPieces();rebuild();updateHUD();
+function loop(now){requestAnimationFrame(loop);updateCam(now);renderer.render(scene,camera)}requestAnimationFrame(loop);
+})();
+</script>
+</body></html>
