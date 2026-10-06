@@ -31,6 +31,7 @@
     box-shadow:0 0 25px #1919A6aa;
     image-rendering:pixelated;
     max-width:95vw; height:auto;
+    touch-action:none;
   }
   #msgOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,0.85);
@@ -66,7 +67,7 @@
 
 <canvas id="game"></canvas>
 
-<div id="keys">Flechas / WASD para moverte</div>
+<div id="keys">Flechas / WASD para moverte · En celular: desliza sobre el tablero</div>
 
 <div id="msgOverlay">
   <h2 id="msgTitle">PAC-MAL</h2>
@@ -414,6 +415,69 @@ window.addEventListener('keyup', (e)=>{
 // "sostenidas" para siempre según el navegador — se limpia la pila para que
 // el fantasma no siga moviéndose solo.
 window.addEventListener('blur', ()=>{ heldDirStack.length = 0; });
+
+// ============================= CONTROL TOUCH / CELULAR =============================
+// Desliza el dedo sobre el tablero en la dirección en que quieras mover el fantasma.
+// El teclado (flechas / WASD) sigue funcionando exactamente igual.
+let touchStartX = 0;
+let touchStartY = 0;
+let touchActive = false;
+const TOUCH_MIN_SWIPE = 12;
+
+function setTouchDirection(dirName){
+  heldDirStack.length = 0;
+  if(dirName) heldDirStack.push(dirName);
+
+  // Fuerza una nueva evaluación cuando el fantasma esté en posición de girar.
+  const cg = ghosts && ghosts.find(g=>g.def.id===controlledId);
+  if(cg) cg._lastDecisionTile = null;
+}
+
+canvas.addEventListener('touchstart', (e)=>{
+  if(!e.touches || !e.touches.length) return;
+  e.preventDefault();
+  ensureAudio();
+  startSiren();
+  touchActive = true;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, {passive:false});
+
+canvas.addEventListener('touchmove', (e)=>{
+  if(!touchActive || !e.touches || !e.touches.length) return;
+  e.preventDefault();
+
+  const x = e.touches[0].clientX;
+  const y = e.touches[0].clientY;
+  const dx = x - touchStartX;
+  const dy = y - touchStartY;
+
+  if(Math.abs(dx) < TOUCH_MIN_SWIPE && Math.abs(dy) < TOUCH_MIN_SWIPE) return;
+
+  let dirName;
+  if(Math.abs(dx) > Math.abs(dy)) dirName = dx > 0 ? 'RIGHT' : 'LEFT';
+  else dirName = dy > 0 ? 'DOWN' : 'UP';
+
+  setTouchDirection(dirName);
+
+  // Reiniciamos el origen para permitir cambiar de dirección con otro gesto
+  // sin tener que levantar obligatoriamente el dedo.
+  touchStartX = x;
+  touchStartY = y;
+}, {passive:false});
+
+canvas.addEventListener('touchend', (e)=>{
+  e.preventDefault();
+  touchActive = false;
+  // Igual que al soltar una tecla: el fantasma se detiene.
+  setTouchDirection(null);
+}, {passive:false});
+
+canvas.addEventListener('touchcancel', ()=>{
+  touchActive = false;
+  setTouchDirection(null);
+}, {passive:false});
+
 canvas.addEventListener('click', ()=>{ ensureAudio(); startSiren(); });
 
 /* ============================= LÓGICA DE FANTASMAS ============================= */
