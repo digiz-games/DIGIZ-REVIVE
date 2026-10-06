@@ -40,13 +40,13 @@ button{padding:0 10px;min-height:44px}
  <div class="card" id="phase"><div class="small">PLANO</div><div class="big" id="planeName">X–Z · CLÁSICO</div></div>
 </div>
 <div id="msg">Selecciona una pieza blanca.</div>
-<div id="legend">X–Z blanco/negro<br>X–Y azul<br>Z–Y rojo</div>
+<div id="legend">Arrastra: girar vista<br>X–Z = piso<br>X–Y azul · Z–Y rojo</div>
 <div id="controls"><button id="skip">SALTAR PLANO</button><button id="musicBtn" title="Música">♫</button><button id="pause">Ⅱ</button></div>
 
 <div class="overlay" id="start">
  <div class="panel">
   <div class="title">TRI-CHESS</div><div class="sub">PROTOTIPO 3D · 2 JUGADORES</div>
-  <div class="desc">Cada pieza existe simultáneamente en <b>tres planos visibles a la vez</b>, unidos por una casilla clara en el origen cartesiano. Elige una sola pieza por turno y muévela en X–Z, Z–Y y X–Y. <b>Arrastra con el dedo</b> para girar libremente la estructura 3D. La cámara enfoca cada plano al avanzar, pero tú puedes cambiar el ángulo antes de elegir la casilla. Una captura en cualquier tablero elimina esa pieza de los tres.</div>
+  <div class="desc">Cada pieza existe simultáneamente en <b>tres planos visibles a la vez</b>, unidos por una casilla clara en el origen cartesiano. Elige una sola pieza por turno y muévela en X–Z, Z–Y y X–Y. <b>Arrastra con el dedo</b> para girar libremente la estructura 3D. La cámara no se mueve sola: tú giras manualmente la estructura con el dedo. El tablero clásico permanece siempre como piso y la cámara nunca pasa por debajo. Una captura en cualquier tablero elimina esa pieza de los tres.</div>
   <button class="start" id="startBtn">INICIAR</button>
  </div>
 </div>
@@ -144,7 +144,7 @@ function advancePlane(){
    phase=0;turn=turn==="w"?"b":"w";selected=null;
    setMsg("Turno de "+(turn==="w"?"BLANCAS":"NEGRAS")+". Selecciona una pieza.");
  }else setMsg("Ahora "+currentPlane().name+". "+(selected?"Mueve la misma pieza o pulsa SALTAR.":""));
- animateCamera();updateHUD();rebuild();
+ updateHUD();rebuild();
 }
 function skip(){
  if(!game||paused)return;
@@ -193,8 +193,9 @@ function rebuild(){
        roughness:.68,depthWrite:false
      });
      const sq=new THREE.Mesh(geo,mat);
-     const drawX=(P.id==="xy")?(7-x):x;
-     sq.position.set(drawX-3.5,0,y-3.5);
+     const drawX=x;
+     const drawY=(P.id==="xy")?(7-y):y;
+     sq.position.set(drawX-3.5,0,drawY-3.5);
      sq.userData={square:true,x,y,plane:P.id};
      g.add(sq);squareMeshes.push(sq);
    }
@@ -210,8 +211,9 @@ function rebuild(){
        p.color==="w"?names[p.type]:blackNames[p.type],
        chosen?"#ffe66d":(p.color==="w"?"#ffffff":"#111111")
      );
-     const drawPX=(P.id==="xy")?(7-x):x;
-     spr.position.set(drawPX-3.5,.50,y-3.5);
+     const drawPX=x;
+     const drawPY=(P.id==="xy")?(7-y):y;
+     spr.position.set(drawPX-3.5,.50,drawPY-3.5);
      spr.scale.multiplyScalar(activePlane?1:.82);
      spr.material.opacity=activePlane?1:.55;
      spr.userData={pieceId:p.id,plane:P.id};
@@ -219,31 +221,16 @@ function rebuild(){
    });
  }
 }
-const focusAngles=[
- {theta:.58,phi:.82},      // XZ
- {theta:1.62,phi:1.34},    // ZY rojo
- {theta:.03,phi:1.34}      // XY azul
-];
+// Cámara manual: el tablero X–Z permanece SIEMPRE como piso.
+// Se permite orbitar alrededor de la estructura, pero nunca bajar bajo el plano del piso.
 let camRadius=18.5,camTheta=.72,camPhi=.92;
-let targetTheta=camTheta,targetPhi=camPhi,autoCam=false;
 function setOrbit(){
- const cx=4,cy=4,cz=4;
+ const cx=4,cy=3.1,cz=4;
+ camPhi=Math.max(.20,Math.min(1.48,camPhi)); // < PI/2: cámara siempre sobre el piso
  const x=cx+camRadius*Math.sin(camPhi)*Math.sin(camTheta);
  const y=cy+camRadius*Math.cos(camPhi);
  const z=cz+camRadius*Math.sin(camPhi)*Math.cos(camTheta);
  camera.position.set(x,y,z);camera.lookAt(cx,cy,cz);
-}
-function animateCamera(){
- targetTheta=focusAngles[phase].theta;targetPhi=focusAngles[phase].phi;autoCam=true;
-}
-function updateCam(){
- if(autoCam){
-   let d=targetTheta-camTheta;
-   while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
-   camTheta+=d*.11;camPhi+=(targetPhi-camPhi)*.11;
-   if(Math.abs(d)<.006&&Math.abs(targetPhi-camPhi)<.006)autoCam=false;
- }
- setOrbit();
 }
 let drag=false,moved=false,lastX=0,lastY=0,downX=0,downY=0;
 canvas.addEventListener("pointerdown",e=>{
@@ -255,9 +242,8 @@ canvas.addEventListener("pointermove",e=>{
  const dx=e.clientX-lastX,dy=e.clientY-lastY;
  if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>7)moved=true;
  if(moved){
-   autoCam=false;
    camTheta-=dx*.009;
-   camPhi=Math.max(.18,Math.min(Math.PI-.18,camPhi-dy*.009));
+   camPhi=Math.max(.20,Math.min(1.48,camPhi-dy*.009));
    setOrbit();
  }
  lastX=e.clientX;lastY=e.clientY;
@@ -317,14 +303,14 @@ function applause(){for(let i=0;i<18;i++){const t=i*.025;tone(500+Math.random()*
 function victory(){[523,659,784,1047,784,1047].forEach((f,i)=>tone(f,i*.18,.28,"triangle",.12))}
 function finish(w){game=false;stopBgMusic();victory();document.getElementById("winner").textContent="GANAN "+w;document.getElementById("over").classList.remove("hidden")}
 function reset(){
- initPieces();phase=0;turn="w";selected=null;game=true;paused=false;camRadius=18.5;camTheta=.72;camPhi=.92;targetTheta=camTheta;targetPhi=camPhi;autoCam=false;setOrbit();rebuild();updateHUD();setMsg("Selecciona una pieza blanca.");
+ initPieces();phase=0;turn="w";selected=null;game=true;paused=false;camRadius=18.5;camTheta=.72;camPhi=.92;setOrbit();rebuild();updateHUD();setMsg("Selecciona una pieza blanca.");
 }
 document.getElementById("startBtn").onclick=()=>{audio();document.getElementById("start").classList.add("hidden");reset();if(musicEnabled)startBgMusic()};
 document.getElementById("again").onclick=()=>{document.getElementById("over").classList.add("hidden");reset();if(musicEnabled)startBgMusic()};
 function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
 addEventListener("resize",resize);resize();
 setOrbit();initPieces();rebuild();updateHUD();
-function loop(){requestAnimationFrame(loop);updateCam();renderer.render(scene,camera)}requestAnimationFrame(loop);
+function loop(){requestAnimationFrame(loop);renderer.render(scene,camera)}requestAnimationFrame(loop);
 })();
 </script>
 </body></html>
