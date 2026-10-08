@@ -322,6 +322,19 @@ sndExplosion.play();
 
 // ================= ASTEROIDES =================
 
+// Genera asteroides cerca del área visible, sin aparecer encima de la nave.
+// No modifica la aparición distante de las naves enemigas.
+spawnAsteroidNearPlayer: function(distanceFactor){
+  var viewW = game.camera.width || game.width;
+  var viewH = game.camera.height || game.height;
+  var angle = Math.random() * Math.PI * 2;
+  var radius = Math.max(180, Math.min(viewW, viewH) * distanceFactor);
+  return {
+    x: Phaser.Math.clamp(player.x + Math.cos(angle)*radius, 100, 19900),
+    y: Phaser.Math.clamp(player.y + Math.sin(angle)*radius, 100, 19900)
+  };
+},
+
 spawnAsteroids: function(){
 
 let r = Math.random();
@@ -334,7 +347,7 @@ else this.createAst3();
 
 createAst1: function(){
 
-let pos = this.spawnFueraPantalla();
+let pos = this.spawnAsteroidNearPlayer(0.7);
 let a = game.add.sprite(pos.x,pos.y,'asteroide');
 game.physics.arcade.enable(a);
 
@@ -357,7 +370,7 @@ ast1.push(a);
 
 createAst2: function(){
 
-let pos = this.spawnFueraPantalla();
+let pos = this.spawnAsteroidNearPlayer(0.85);
 let a = game.add.sprite(pos.x,pos.y,'asteroide2');
 game.physics.arcade.enable(a);
 
@@ -366,7 +379,11 @@ a.scale.set(scale);
 
 let speed = 800 - (scale*150);
 
-game.physics.arcade.velocityFromAngle(game.rnd.angle(),speed,a.body.velocity);
+// Vuela hacia una zona próxima a la nave, con variación para que pueda esquivarse.
+let targetX = player.x + game.rnd.integerInRange(-110,110);
+let targetY = player.y + game.rnd.integerInRange(-110,110);
+let angle = Math.atan2(targetY - pos.y, targetX - pos.x);
+a.body.velocity.set(Math.cos(angle)*speed, Math.sin(angle)*speed);
 
 ast2.push(a);
 
@@ -374,7 +391,7 @@ ast2.push(a);
 
 createAst3: function(){
 
-let pos = this.spawnFueraPantalla();
+let pos = this.spawnAsteroidNearPlayer(0.65);
 let a = game.add.sprite(pos.x,pos.y,'asteroide3');
 game.physics.arcade.enable(a);
 
@@ -391,7 +408,7 @@ game.rnd.integerInRange(-10,10),
 game.rnd.integerInRange(-10,10)
 );
 
-a.body.drag.set(60);
+// Sin drag excesivo: conserva su movimiento lento y su masa elevada.
   
 ast3.push(a);
 
