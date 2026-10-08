@@ -25,6 +25,7 @@ var music;
 var gameEnded = false;
 var healthOrbs = [];
 var healthOrbTimer = null;
+var asteroidConfig = {world:20000, safe:950, giantCount:32, fastLimit:48};
 var sndLaser, sndLaser1, sndLaser2, sndLaser3, sndExplosion;
 
 // ================= GAME =================
@@ -113,6 +114,9 @@ weapon.bulletLifespan = 400;
 weapon.bulletSpeed = 1800;
 weapon.fireRate = 120;
 weapon.trackSprite(player,0,0,true);
+
+// Permanent large rigid asteroids distributed at the beginning of the game.
+for (var g=0; g<asteroidConfig.giantCount; g++) this.createAst3();
 
 // SPAWN
 game.time.events.loop(1500,this.spawnEnemy,this);
@@ -321,167 +325,199 @@ sndExplosion.play();
 },
 
 // ================= ASTEROIDES =================
-
-// Genera asteroides cerca del área visible, sin aparecer encima de la nave.
-// No modifica la aparición distante de las naves enemigas.
-spawnAsteroidNearPlayer: function(distanceFactor){
-  var viewW = game.camera.width || game.width;
-  var viewH = game.camera.height || game.height;
-  var angle = Math.random() * Math.PI * 2;
-  var radius = Math.max(180, Math.min(viewW, viewH) * distanceFactor);
-  return {
-    x: Phaser.Math.clamp(player.x + Math.cos(angle)*radius, 100, 19900),
-    y: Phaser.Math.clamp(player.y + Math.sin(angle)*radius, 100, 19900)
-  };
+// All sizes are measured using the rendered sprite dimensions, not arbitrary categories.
+// Arcade Physics is AABB-based; collision boxes are deliberately conservative.
+asteroidRadius: function(a){ return Math.max(a.width,a.height)*0.43; },
+farFromPlayer: function(x,y,r){
+  return Math.hypot(x-player.x,y-player.y) > asteroidConfig.safe+r &&
+         Math.abs(x-player.x)>game.camera.width*0.55+r ||
+         Math.hypot(x-player.x,y-player.y) > asteroidConfig.safe+r &&
+         Math.abs(y-player.y)>game.camera.height*0.55+r;
 },
-
+canPlaceAsteroid: function(x,y,r){
+  if(x<r+60 || y<r+60 || x>20000-r-60 || y>20000-r-60) return false;
+  if(!this.farFromPlayer(x,y,r)) return false;
+  var all=ast1.concat(ast2,ast3);
+  for(var i=0;i<all.length;i++){
+    var a=all[i];
+    if(a.alive && Math.hypot(x-a.x,y-a.y)<r+this.asteroidRadius(a)+80) return false;
+  }
+  return true;
+},
+peripheralPosition: function(r){
+  // At least 950 world pixels away, AND beyond the visible camera rectangle.
+  for(var i=0;i<45;i++){
+    var angle=Math.random()*Math.PI*2;
+    var dist=Math.max(asteroidConfig.safe+r+100,Math.hypot(game.camera.width,game.camera.height)*0.7+r+150);
+    dist+=Math.random()*500;
+    var x=Phaser.Math.clamp(player.x+Math.cos(angle)*dist,r+70,20000-r-70);
+    var y=Phaser.Math.clamp(player.y+Math.sin(angle)*dist,r+70,20000-r-70);
+    if(this.canPlaceAsteroid(x,y,r)) return {x:x,y:y};
+  }
+  return null;
+},
+worldPosition: function(r){
+  for(var i=0;i<90;i++){
+    var x=game.rnd.realInRange(r+70,20000-r-70);
+    var y=game.rnd.realInRange(r+70,20000-r-70);
+    if(this.canPlaceAsteroid(x,y,r)) return {x:x,y:y};
+  }
+  return null;
+},
+setupAsteroid: function(a,kind,scale){
+  a.anchor.set(0.5); a.scale.set(scale);
+  game.physics.arcade.enable(a);
+  a.body.setSize(a.texture.frame.width*0.80,a.texture.frame.height*0.80,
+                 a.texture.frame.width*0.10,a.texture.frame.height*0.10);
+  a.kind=kind;
+  a.radius=this.asteroidRadius(a);
+  a.body.collideWorldBounds=true;
+  a.body.bounce.set(kind===3?0:0.35);
+  a.body.immovable=(kind===3);
+  a.body.moves=(kind!==3);
+  return a;
+},
 spawnAsteroids: function(){
-
-let r = Math.random();
-
-if(r < 0.6) this.createAst2();
-else if(r < 0.85) this.createAst1();
-else this.createAst3();
-
+  if(gameEnded) return;
+  // The heavy giants are generated only at game start, never dynamically.
+  if(Math.random()<0.72) this.createAst2();
+  else this.createAst1();
 },
-
 createAst1: function(){
-
-let pos = this.spawnAsteroidNearPlayer(0.7);
-let a = game.add.sprite(pos.x,pos.y,'asteroide');
-game.physics.arcade.enable(a);
-
-let scale = game.rnd.realInRange(0.5,1.5);
-a.scale.set(scale);
-
-a.hp = Math.floor(3 * scale);
-
-a.body.mass = scale * 2;
-a.body.bounce.set(0.6);
-
-a.body.velocity.set(
-game.rnd.integerInRange(-50,50),
-game.rnd.integerInRange(-50,50)
-);
-
-ast1.push(a);
-
+  var scale=game.rnd.realInRange(0.55,1.25);
+  var base=game.cache.getImage('asteroide');
+  var r=Math.max(base.width,base.height)*scale*0.43;
+  var pos=this.peripheralPosition(r); if(!pos) return;
+  var a=this.setupAsteroid(game.add.sprite(pos.x,pos.y,'asteroide'),1,scale);
+  a.hp=3;
+  a.body.mass=Math.max(2,scale*5);
+  a.body.velocity.set(game.rnd.integerInRange(-32,32),game.rnd.integerInRange(-32,32));
+  ast1.push(a);
 },
-
 createAst2: function(){
-
-let pos = this.spawnAsteroidNearPlayer(0.85);
-let a = game.add.sprite(pos.x,pos.y,'asteroide2');
-game.physics.arcade.enable(a);
-
-let scale = game.rnd.frac()<0.8 ? 0.3 : game.rnd.realInRange(1,4);
-a.scale.set(scale);
-
-let speed = 800 - (scale*150);
-
-// Vuela hacia una zona próxima a la nave, con variación para que pueda esquivarse.
-let targetX = player.x + game.rnd.integerInRange(-110,110);
-let targetY = player.y + game.rnd.integerInRange(-110,110);
-let angle = Math.atan2(targetY - pos.y, targetX - pos.x);
-a.body.velocity.set(Math.cos(angle)*speed, Math.sin(angle)*speed);
-
-ast2.push(a);
-
+  if(ast2.filter(function(a){return a.alive;}).length>=asteroidConfig.fastLimit) return;
+  // Small and fast = common. Big and slower = rare.
+  var chance=Math.random();
+  var scale=chance<0.68?game.rnd.realInRange(0.22,0.60):
+            chance<0.92?game.rnd.realInRange(0.65,1.7):
+                         game.rnd.realInRange(2.2,5.5);
+  var base=game.cache.getImage('asteroide2');
+  var r=Math.max(base.width,base.height)*scale*0.43;
+  var pos=this.peripheralPosition(r); if(!pos) return;
+  var a=this.setupAsteroid(game.add.sprite(pos.x,pos.y,'asteroide2'),2,scale);
+  a.body.mass=Math.max(1,Math.pow(scale,2)*8);
+  var speed=Phaser.Math.clamp(850/(0.7+scale*0.72),85,850);
+  // Travel across the playfield, not spawn on top of the player.
+  var targetX=player.x+game.rnd.integerInRange(-450,450);
+  var targetY=player.y+game.rnd.integerInRange(-450,450);
+  var theta=Math.atan2(targetY-pos.y,targetX-pos.x);
+  a.body.velocity.set(Math.cos(theta)*speed,Math.sin(theta)*speed);
+  ast2.push(a);
 },
-
 createAst3: function(){
-
-let pos = this.spawnAsteroidNearPlayer(0.65);
-let a = game.add.sprite(pos.x,pos.y,'asteroide3');
-game.physics.arcade.enable(a);
-
-let scale = game.rnd.realInRange(3,6);
-a.scale.set(scale);
-
-a.hp = Math.floor(10 + scale*5);
-
-a.body.mass = scale * 40;
-a.body.bounce.set(0.05);
-
-a.body.velocity.set(
-game.rnd.integerInRange(-10,10),
-game.rnd.integerInRange(-10,10)
-);
-
-// Sin drag excesivo: conserva su movimiento lento y su masa elevada.
-  
-ast3.push(a);
-
+  var scale=game.rnd.realInRange(3,6);
+  var base=game.cache.getImage('asteroide3');
+  var r=Math.max(base.width,base.height)*scale*0.43;
+  var pos=this.worldPosition(r); if(!pos) return;
+  var a=this.setupAsteroid(game.add.sprite(pos.x,pos.y,'asteroide3'),3,scale);
+  a.hp=Infinity; a.body.mass=1000000;
+  a.body.velocity.set(0);
+  ast3.push(a);
 },
-
+explodeAsteroid: function(a){
+  if(!a || !a.alive) return;
+  a.kill();
+  if(sndExplosion) sndExplosion.play();
+},
+// Collision response rules. Large impacts destroy both comparable objects;
+// small projectiles cannot erase permanent giants.
+fastAgainstAsteroid: function(fixed,moving){
+  if(!fixed.alive || !moving.alive) return;
+  var ratio=moving.radius/fixed.radius;
+  if(ratio>=0.90){
+    this.explodeAsteroid(moving);
+    this.explodeAsteroid(fixed);
+  }else{
+    this.explodeAsteroid(moving);
+  }
+},
+fastAgainstFast: function(a,b){
+  if(!a.alive || !b.alive) return;
+  var ratio=Math.min(a.radius,b.radius)/Math.max(a.radius,b.radius);
+  if(ratio>=0.85){this.explodeAsteroid(a);this.explodeAsteroid(b);}
+  else this.explodeAsteroid(a.radius<b.radius?a:b);
+},
+fastAgainstPlayer: function(p,a){
+  if(gameEnded || !a.alive) return;
+  var relative=Math.hypot(a.body.velocity.x-p.body.velocity.x,a.body.velocity.y-p.body.velocity.y);
+  var sizeRatio=a.radius/Math.max(p.width,p.height)*2;
+  // A giant impact kills instantly. Small impacts cause scaled damage.
+  var damage=(sizeRatio>=2 && relative>=90)?maxVida:
+             Math.max(3,Math.round(5*Math.pow(Math.max(0.3,sizeRatio),1.6)*Math.max(0.6,relative/350)));
+  vida=Math.max(0,vida-damage);
+  this.explodeAsteroid(a);
+},
 updateAsteroids: function(){
-
-// ================= COLISIONES =================
-
-// ast1 normales
-ast1.forEach(a=>{
+  var self=this;
+  ast1=ast1.filter(function(a){return a.alive;});
+  ast2=ast2.filter(function(a){return a.alive;});
+  ast3=ast3.filter(function(a){return a.alive;});
+  // The player cannot phase through normal or giant asteroids.
+  ast1.forEach(function(a){
     game.physics.arcade.collide(player,a);
-});
-
-// ast3 pesados (con amortiguación real)
-ast3.forEach(a=>{
-    game.physics.arcade.collide(player,a, function(player, a){
-
-        // 🔥 mata el impulso acumulado
-        a.body.velocity.x *= 0.2;
-        a.body.velocity.y *= 0.2;
-
+    game.physics.arcade.overlap(a,weapon.bullets,function(rock,bullet){
+      if(!rock.alive || !bullet.alive)return;
+      bullet.kill(); rock.hp--;
+      if(rock.hp<=0)self.explodeAsteroid(rock);
     });
-});
-
-
-// ================= LIMITADOR DE VELOCIDAD =================
-
-ast3.forEach(a => {
-
-    let maxSpeed = 40;
-
-    a.body.velocity.x = Phaser.Math.clamp(a.body.velocity.x, -maxSpeed, maxSpeed);
-    a.body.velocity.y = Phaser.Math.clamp(a.body.velocity.y, -maxSpeed, maxSpeed);
-
-});
-
-
-// ================= DAÑO Y DESTRUCCIÓN =================
-
-// ast1 destrucción
-ast1.forEach(a=>{
-    game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
-        b.kill(); 
-        a.hp--;
-        if(a.hp<=0){ 
-            a.kill(); 
-            sndExplosion.play(); 
-        }
+  });
+  ast3.forEach(function(a){
+    game.physics.arcade.collide(player,a);
+    // Bullets are absorbed; the rigid giants cannot be shot apart.
+    game.physics.arcade.overlap(a,weapon.bullets,function(rock,bullet){bullet.kill();});
+  });
+  // Moving asteroids collide with every class of asteroid and the ship.
+  ast2.forEach(function(a){
+    game.physics.arcade.overlap(player,a,function(p,rock){self.fastAgainstPlayer(p,rock);});
+    ast1.forEach(function(b){
+      game.physics.arcade.overlap(a,b,function(fast,normal){self.fastAgainstAsteroid(normal,fast);});
     });
-});
-
-// ast3 destrucción
-ast3.forEach(a=>{
-    game.physics.arcade.overlap(a,weapon.bullets,(a,b)=>{
-        b.kill(); 
-        a.hp--;
-        if(a.hp<=0){ 
-            a.kill(); 
-            sndExplosion.play(); 
-        }
+    ast3.forEach(function(b){
+      game.physics.arcade.overlap(a,b,function(fast,giant){self.fastAgainstAsteroid(giant,fast);});
     });
-});
-
-// ast2 destructivo
-ast2.forEach(a=>{
-    game.physics.arcade.overlap(player,a,()=>{
-        vida = Math.max(0, vida - 5);
-        a.kill();
-        sndExplosion.play();
+    game.physics.arcade.overlap(a,weapon.bullets,function(rock,bullet){
+      if(bullet.alive)bullet.kill();
+      // Player shots do not change the meteor's trajectory or size.
     });
-});
-
+  });
+  for(var i=0;i<ast2.length;i++)for(var j=i+1;j<ast2.length;j++){
+    game.physics.arcade.overlap(ast2[i],ast2[j],function(a,b){self.fastAgainstFast(a,b);});
+  }
+  // All solid sprites: ship versus enemies, and enemies versus all asteroids.
+  var ships=enemies.concat(enemies2,enemies3);
+  ships.forEach(function(e){
+    if(!e.alive)return;
+    game.physics.arcade.collide(player,e);
+    ast1.forEach(function(a){game.physics.arcade.collide(e,a);});
+    ast3.forEach(function(a){game.physics.arcade.collide(e,a);});
+    ast2.forEach(function(a){game.physics.arcade.overlap(e,a,function(ship,rock){
+      if(!rock.alive)return;
+      if(rock.radius>=Math.max(ship.width,ship.height)*0.45)ship.kill();
+      self.explodeAsteroid(rock);
+    });});
+  });
+  for(var x=0;x<ships.length;x++)for(var y=x+1;y<ships.length;y++){
+    if(ships[x].alive&&ships[y].alive)game.physics.arcade.collide(ships[x],ships[y]);
+  }
+  // Nonmoving asteroid collisions and barriers.
+  for(var k=0;k<ast1.length;k++){
+    ast3.forEach(function(g){game.physics.arcade.collide(ast1[k],g);});
+    for(var z=k+1;z<ast1.length;z++)game.physics.arcade.collide(ast1[k],ast1[z]);
+  }
+  // Remove meteors that have crossed well beyond the local play area.
+  ast2.forEach(function(a){
+    if(a.alive && Math.hypot(a.x-player.x,a.y-player.y)>4200) a.kill();
+  });
 },
 
 // ================= INPUT =================
@@ -525,16 +561,19 @@ return {x:player.x+game.rnd.integerInRange(-margin,margin),y:player.y-2000};
 
 // ================= HEALTH PICKUPS =================
 spawnHealthOrb: function(){
-  if (gameEnded || !player || !player.alive || healthOrbs.filter(function(o){return o.alive;}).length >= 2) return;
-  var angle = Math.random() * Math.PI * 2;
-  var radius = Math.min(game.width, game.height) * 0.38;
-  var orb = game.add.graphics(player.x + Math.cos(angle)*radius, player.y + Math.sin(angle)*radius);
-  orb.beginFill(0x00ff65, 0.25); orb.drawCircle(0, 0, 38); orb.endFill();
-  orb.beginFill(0x55ff88, 1); orb.drawCircle(0, 0, 20); orb.endFill();
-  orb.beginFill(0xffffff, 0.85); orb.drawCircle(-3, -3, 6); orb.endFill();
+  if(gameEnded || !player || !player.alive || healthOrbs.filter(function(o){return o.alive;}).length>=2) return;
+  var pos=this.peripheralPosition(12);
+  if(!pos)return;
+  // Tiny, translucent glimmer rather than a solid green ball.
+  var orb=game.add.graphics(pos.x,pos.y);
+  orb.beginFill(0x44ff88,0.10);orb.drawCircle(0,0,26);orb.endFill();
+  orb.beginFill(0x55ffaa,0.30);orb.drawCircle(0,0,12);orb.endFill();
+  orb.beginFill(0xdffff0,0.90);orb.drawCircle(0,0,4);orb.endFill();
+  orb.lineStyle(1.5,0xaaffcc,0.65);orb.moveTo(-11,0);orb.lineTo(11,0);
+  orb.moveTo(0,-11);orb.lineTo(0,11);
   game.physics.arcade.enable(orb);
-  orb.body.setSize(30,30,-15,-15);
-  orb.expireAt = game.time.now + 10000;
+  orb.body.setSize(16,16,-8,-8);
+  orb.expireAt=game.time.now+20000;
   healthOrbs.push(orb);
 },
 updateHealthOrbs: function(){
