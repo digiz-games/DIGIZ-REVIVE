@@ -1,73 +1,27 @@
-var record = localStorage.getItem("record");
-
 var Dead = {
-  preload: function(){
-    game.stage.backgroundColor = '#000000';
-    game.load.image("boton", "assets/sprites/boton.png");
-    game.load.image("logo", "assets/map/digizlogo.png");
-    game.load.image("logo", "assets/map/virgo_menu.png");
-
-
-    //game.scale.scaleMode = Phaser.ScaleManager.EXACT_FIT;
-    game.scale.pageAlignHorizontally = true;
-    game.scale.pageAlignVertically = true;
-
-    //game.scale.fullScreenScaleMode = Phaser.ScaleManager.SHOW_ALL;
-    firstRunLandscape = game.scale.isGameLandscape;
-    game.scale.forceOrientation(false, true);
-    game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
-    game.scale.setShowAll();
-    window.addEventListener('resize', function () {  this.game.scale.refresh();});
-
-    this.game.scale.refresh();
-
+  create: function () {
+    game.stage.backgroundColor = '#050b1d';
+    var result = VirgoResults;
+    var portrait = game.width < game.height;
+    var size = Math.max(19, Math.min(38, game.width / 15));
+    var message = 'GAME OVER\n\nNaves destruidas: ' + result.score + '\nTiempo: ' + result.seconds + ' s\nRécord: ' + result.record;
+    var txt = game.add.text(game.width / 2, game.height * 0.42, message,
+      {font:'bold ' + size + 'px Arial',fill:'#ffffff',align:'center',stroke:'#000000',strokeThickness:4});
+    txt.anchor.set(0.5);
+    txt.wordWrap = true;
+    txt.wordWrapWidth = game.width * 0.92;
+    var btn = game.add.text(game.width / 2, game.height * 0.79, 'VOLVER AL MENÚ',
+      {font:'bold ' + Math.max(20, size * 0.85) + 'px Arial',fill:'#72fff1',align:'center'});
+    btn.anchor.set(0.5);
+    btn.inputEnabled = true;
+    btn.input.useHandCursor = true;
+    btn.events.onInputDown.add(this.goMenu, this);
+    // Automatic return; button allows an earlier return.
+    this.returnEvent = game.time.events.add(6000, this.goMenu, this);
   },
-  create: function(){
-
-game.add.tileSprite(0, 0, 1000, 1000, 'fondo');
-
-    var boton = this.add.button(game.width/2,game.height/2 +100,'boton',this.iniciarJuego,this);
-    boton.anchor.setTo(0.5);
-    boton.scale.setTo(0.8, 0.8);
-
-/*
-    logo = game.add.sprite(game.width/2,game.height/2 -125, 'logo');
-    logo.anchor.setTo(0.5, 0.5);
-    logo.scale.setTo(0.2, 0.2);
-*/
-    textdead = game.add.text(game.width/2, game.height/2-100, 'Game Over', { font: "64px Arial", fill: "#FF0000", align: "center" });
-
-    textdead.anchor.set(0.5);
-     textdead.align = 'center';
-     textdead.font = 'Arial Black';
-     textdead.fontSize = 50;
-     textdead.fontWeight = 'bold';
-     textdead.stroke = '#FF0000';
-     textdead.strokeThickness = 6;
-     textdead.fill = '#000000';
-
-    textscore = game.add.text(game.width/2, game.height/2-50, 'Score: '+ counter, { font: "34px Arial", fill: "#ffffff", align: "center" });
-      textscore.anchor.setTo(0.5, 0.5);
-
-    text = game.add.text(game.width/2, game.height/2, 'Record: '+ record, { font: "64px Arial", fill: "#ffffff", align: "center" });
-      text.anchor.setTo(0.5, 0.5);
-
-      text.anchor.set(0.5);
-     text.align = 'center';
-     text.font = 'Arial Black';
-     text.fontSize = 38;
-     text.fontWeight = 'bold';
-     text.stroke = '#000000';
-     text.strokeThickness = 6;
-     text.fill = '#ffffff';
-
-      counter = 0;
+  goMenu: function () {
+    if (this.returnEvent) { game.time.events.remove(this.returnEvent); this.returnEvent = null; }
+    game.state.start('Menu', true, false);
   },
-
-
-  iniciarJuego: function(){
-
-    this.state.start('Menu',true,false);
-  }
-
+  shutdown: function () { if (this.returnEvent) game.time.events.remove(this.returnEvent); this.returnEvent = null; }
 };
