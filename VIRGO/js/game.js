@@ -22,6 +22,9 @@ var scoreText;
 var vidaBar;
 
 var music;
+var gameEnded = false;
+var healthOrbs = [];
+var healthOrbTimer = null;
 var sndLaser, sndLaser1, sndLaser2, sndLaser3, sndExplosion;
 
 // ================= GAME =================
@@ -50,20 +53,22 @@ game.load.audio('laser1', 'assets/audio/laser1.mp3');
 game.load.audio('laser2', 'assets/audio/laser2.mp3');
 game.load.audio('laser3', 'assets/audio/laser3.mp3');
 game.load.audio('explosion', 'assets/audio/explosion.wav');
-game.load.audio('music', 'assets/audio/virgo_song.mp3');
+game.load.audio('music', 'Virgo_Song.mp3');
 
 },
 
 create: function(){
 
 // LIMPIEZA
-game.world.removeAll();
 game.time.events.removeAll();
 game.input.onDown.removeAll();
 
 enemies = []; enemies2 = []; enemies3 = [];
 weapons1 = []; weapons2 = []; weapons3 = [];
 ast1 = []; ast2 = []; ast3 = [];
+healthOrbs = [];
+gameEnded = false;
+lastTap = 0;
 
 vida = maxVida;
 counter = 0;
@@ -112,6 +117,8 @@ weapon.trackSprite(player,0,0,true);
 // SPAWN
 game.time.events.loop(1500,this.spawnEnemy,this);
 game.time.events.loop(700,this.spawnAsteroids,this);
+// Occasional health orb: one every 18–30 seconds, maximum two active.
+healthOrbTimer = game.time.events.loop(24000, this.spawnHealthOrb, this);
 
 game.input.onDown.add(this.handleInput,this);
 
@@ -121,6 +128,7 @@ startTime = game.time.now;
 
 update: function(){
 
+if(gameEnded) return;
 if(vida <= 0){ this.dead(); return; }
 
 // MOVIMIENTO
@@ -136,6 +144,8 @@ this.updateEnemies();
 
 // ASTEROIDES
 this.updateAsteroids();
+this.updateHealthOrbs();
+if(vida <= 0){ this.dead(); return; }
 
 // UI
 scoreText.text = "Score: " + counter;
@@ -235,7 +245,7 @@ if(enemy.hp <= 0){
 
 enemy.kill();
 sndExplosion.play();
-counter++;
+if(!gameEnded) counter++;
 
 //Cantidad De ENEMIGOS
   
@@ -305,7 +315,8 @@ if(type==3){ enemies3.push(e); weapons3.push(w); }
 
 hitPlayer: function(player,bullet){
 bullet.kill();
-vida -= 10;
+if (gameEnded) return;
+vida = Math.max(0, vida - 10);
 sndExplosion.play();
 },
 
@@ -448,7 +459,7 @@ ast3.forEach(a=>{
 // ast2 destructivo
 ast2.forEach(a=>{
     game.physics.arcade.overlap(player,a,()=>{
-        vida -= 5;
+        vida = Math.max(0, vida - 5);
         a.kill();
         sndExplosion.play();
     });
@@ -459,6 +470,7 @@ ast2.forEach(a=>{
 // ================= INPUT =================
 
 handleInput: function(pointer){
+if (gameEnded) return;
 
 let now = Date.now();
 
@@ -475,6 +487,7 @@ this.fire();
 },
 
 fire: function(){
+if (gameEnded) return;
 let b = weapon.fire();
 if(b) sndLaser.play();
 },
@@ -493,24 +506,49 @@ return {x:player.x+game.rnd.integerInRange(-margin,margin),y:player.y-2000};
 
 },
 
+// ================= HEALTH PICKUPS =================
+spawnHealthOrb: function(){
+  if (gameEnded || !player || !player.alive || healthOrbs.filter(function(o){return o.alive;}).length >= 2) return;
+  var angle = Math.random() * Math.PI * 2;
+  var radius = Math.min(game.width, game.height) * 0.38;
+  var orb = game.add.graphics(player.x + Math.cos(angle)*radius, player.y + Math.sin(angle)*radius);
+  orb.beginFill(0x00ff65, 0.25); orb.drawCircle(0, 0, 38); orb.endFill();
+  orb.beginFill(0x55ff88, 1); orb.drawCircle(0, 0, 20); orb.endFill();
+  orb.beginFill(0xffffff, 0.85); orb.drawCircle(-3, -3, 6); orb.endFill();
+  game.physics.arcade.enable(orb);
+  orb.body.setSize(30,30,-15,-15);
+  orb.expireAt = game.time.now + 10000;
+  healthOrbs.push(orb);
+},
+updateHealthOrbs: function(){
+  for (var i = healthOrbs.length - 1; i >= 0; i--) {
+    var orb = healthOrbs[i];
+    if (!orb.alive || game.time.now >= orb.expireAt) {
+      orb.destroy(); healthOrbs.splice(i,1); continue;
+    }
+    game.physics.arcade.overlap(player, orb, function(p, pickup){
+      vida = Math.min(maxVida, vida + maxVida * 0.10);
+      pickup.destroy();
+    }, null, this);
+  }
+},
 // ================= DEAD =================
-
 dead: function(){
-
-music.stop();
-
-let tiempo = Math.floor((game.time.now - startTime)/1000);
-
-let txt = game.add.text(game.camera.width/2,game.camera.height/2,
-"GAME OVER\n\nScore: "+counter+"\nTiempo: "+tiempo+"s\n\nToca para reiniciar",
-{font:"40px Arial",fill:"#fff",align:"center"});
-
-txt.anchor.set(0.5);
-txt.fixedToCamera = true;
-
-game.input.onDown.removeAll();
-game.input.onDown.addOnce(()=>game.state.restart(true,false));
-
+  if (gameEnded) return;
+  gameEnded = true;
+  var seconds = Math.max(0, Math.floor((game.time.now - startTime) / 1000));
+  var finalScore = counter;
+  var best = VirgoStorage.save(finalScore);
+  VirgoResults = {score:finalScore, seconds:seconds, record:best};
+  if (music) music.stop();
+  game.time.events.removeAll();
+  game.input.onDown.removeAll();
+  game.state.start('Dead', true, false);
+},
+shutdown: function(){
+  if (music) music.stop();
+  if (healthOrbTimer) {game.time.events.remove(healthOrbTimer); healthOrbTimer=null;}
+  healthOrbs.forEach(function(orb){if(orb && orb.exists) orb.destroy();});
+  healthOrbs=[];
 }
-
 };
