@@ -1,3 +1,3 @@
 import "./menu.js";
 
-console.log("Dragma´s iniciado");
+console.log("Dragma´s main ok");
